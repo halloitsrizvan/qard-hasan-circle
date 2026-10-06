@@ -74,7 +74,20 @@ export async function seedFirestore(force = false): Promise<{ success: boolean; 
       return { success: true, message: 'Firestore is already seeded with data.' };
     }
 
+    const [existingLoans, existingConts, existingLedger] = await Promise.all([
+      getDocs(collection(db, LOANS_COL)),
+      getDocs(collection(db, CONTRIBUTIONS_COL)),
+      getDocs(collection(db, LEDGER_COL))
+    ]);
+
     const batch = writeBatch(db);
+
+    // Delete any non-seed extra docs if force is true
+    if (force) {
+      existingLoans.docs.forEach((d) => batch.delete(d.ref));
+      existingConts.docs.forEach((d) => batch.delete(d.ref));
+      existingLedger.docs.forEach((d) => batch.delete(d.ref));
+    }
 
     batch.set(circleDocRef, defaultCircle);
 
