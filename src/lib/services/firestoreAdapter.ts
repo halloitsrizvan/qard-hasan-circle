@@ -311,7 +311,7 @@ export async function fetchLedgerFromDB(): Promise<LedgerEntry[]> {
     const snaps = await getDocs(collection(db, LEDGER_COL));
     if (!snaps.empty) {
       const items = snaps.docs.map((d) => d.data() as LedgerEntry);
-      localLedger = items.sort((a, b) => a.date.localeCompare(b.date));
+      localLedger = items.sort((a, b) => a.id.localeCompare(b.id));
       return structuredClone(localLedger);
     }
   } catch (err) {
@@ -328,11 +328,20 @@ export async function verifyLedgerInDB(): Promise<boolean> {
 
   for (const e of entries) {
     total += e.amount;
-    const { hash, ...rest } = e;
-    if (e.balance !== total || e.previousHash !== previous || hash !== fingerprint(JSON.stringify(rest))) {
+    const payload = {
+      id: e.id,
+      date: e.date,
+      type: e.type,
+      description: e.description,
+      amount: e.amount,
+      balance: e.balance,
+      previousHash: e.previousHash
+    };
+    const expectedHash = fingerprint(JSON.stringify(payload));
+    if (e.balance !== total || e.previousHash !== previous || e.hash !== expectedHash) {
       return false;
     }
-    previous = hash;
+    previous = e.hash;
   }
   return total === circle.balance;
 }
