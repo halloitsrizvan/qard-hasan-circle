@@ -1,24 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
-export const Route = createFileRoute("/")({
-  component: Index,
-});
-
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
-  return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
-  );
-}
+import { createFileRoute } from '@tanstack/react-router';
+import { OverviewPage } from '@/components/circle/overview';
+import { circleHead } from '@/lib/route-head';
+import { circleQueries } from '@/lib/services';
+export const Route=createFileRoute('/')({head:()=>circleHead('Circle Overview','A transparent view of the Mahallu interest-free lending pool, community contributions, and principal-only repayments.'),loader:async({context})=>{await Promise.all([context.queryClient.ensureQueryData(circleQueries.overview),context.queryClient.ensureQueryData(circleQueries.loans),context.queryClient.ensureQueryData(circleQueries.ledger),context.queryClient.ensureQueryData(circleQueries.members)])},component:OverviewPage});
