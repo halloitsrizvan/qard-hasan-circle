@@ -10,33 +10,128 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CommitteeRouteImport } from './routes/committee'
+import { Route as ContributionsRouteImport } from './routes/contributions'
+import { Route as LedgerRouteImport } from './routes/ledger'
+import { Route as LoansRouteImport } from './routes/loans'
+import { Route as MembersRouteImport } from './routes/members'
+import { Route as RulesRouteImport } from './routes/rules'
+import { Route as SettingsRouteImport } from './routes/settings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CommitteeRoute = CommitteeRouteImport.update({
+  id: '/committee',
+  path: '/committee',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContributionsRoute = ContributionsRouteImport.update({
+  id: '/contributions',
+  path: '/contributions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LedgerRoute = LedgerRouteImport.update({
+  id: '/ledger',
+  path: '/ledger',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoansRoute = LoansRouteImport.update({
+  id: '/loans',
+  path: '/loans',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MembersRoute = MembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RulesRoute = RulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/committee': typeof CommitteeRoute
+  '/contributions': typeof ContributionsRoute
+  '/ledger': typeof LedgerRoute
+  '/loans': typeof LoansRoute
+  '/members': typeof MembersRoute
+  '/rules': typeof RulesRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/committee': typeof CommitteeRoute
+  '/contributions': typeof ContributionsRoute
+  '/ledger': typeof LedgerRoute
+  '/loans': typeof LoansRoute
+  '/members': typeof MembersRoute
+  '/rules': typeof RulesRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/committee': typeof CommitteeRoute
+  '/contributions': typeof ContributionsRoute
+  '/ledger': typeof LedgerRoute
+  '/loans': typeof LoansRoute
+  '/members': typeof MembersRoute
+  '/rules': typeof RulesRoute
+  '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/committee'
+    | '/contributions'
+    | '/ledger'
+    | '/loans'
+    | '/members'
+    | '/rules'
+    | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/committee'
+    | '/contributions'
+    | '/ledger'
+    | '/loans'
+    | '/members'
+    | '/rules'
+    | '/settings'
+  id:
+    | '__root__'
+    | '/'
+    | '/committee'
+    | '/contributions'
+    | '/ledger'
+    | '/loans'
+    | '/members'
+    | '/rules'
+    | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CommitteeRoute: typeof CommitteeRoute
+  ContributionsRoute: typeof ContributionsRoute
+  LedgerRoute: typeof LedgerRoute
+  LoansRoute: typeof LoansRoute
+  MembersRoute: typeof MembersRoute
+  RulesRoute: typeof RulesRoute
+  SettingsRoute: typeof SettingsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +143,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/committee': {
+      id: '/committee'
+      path: '/committee'
+      fullPath: '/committee'
+      preLoaderRoute: typeof CommitteeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contributions': {
+      id: '/contributions'
+      path: '/contributions'
+      fullPath: '/contributions'
+      preLoaderRoute: typeof ContributionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ledger': {
+      id: '/ledger'
+      path: '/ledger'
+      fullPath: '/ledger'
+      preLoaderRoute: typeof LedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loans': {
+      id: '/loans'
+      path: '/loans'
+      fullPath: '/loans'
+      preLoaderRoute: typeof LoansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/members': {
+      id: '/members'
+      path: '/members'
+      fullPath: '/members'
+      preLoaderRoute: typeof MembersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rules': {
+      id: '/rules'
+      path: '/rules'
+      fullPath: '/rules'
+      preLoaderRoute: typeof RulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CommitteeRoute: CommitteeRoute,
+  ContributionsRoute: ContributionsRoute,
+  LedgerRoute: LedgerRoute,
+  LoansRoute: LoansRoute,
+  MembersRoute: MembersRoute,
+  RulesRoute: RulesRoute,
+  SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

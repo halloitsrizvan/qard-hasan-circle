@@ -1,0 +1,1 @@
+export function circleHead(title:string,description:string){return {meta:[{title:`${title} — Qard Hasan Circles`},{name:'description',content:description},{property:'og:title',content:`${title} — Qard Hasan Circles`},{property:'og:description',content:description},{property:'og:type',content:'website'},{name:'twitter:card',content:'summary_large_image'}]}}
