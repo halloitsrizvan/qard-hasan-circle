@@ -60,7 +60,20 @@ These rules are strictly validated by the application logic:
   - **Malayalam (മലയാളം)** (`ml`)
   - **Hindi (हिन्दी)** (`hi`)
 
-### 5. ⚡ 5-Minute Guided Live Demo Tour
+### 5. 🌐 Public Landing Page & Educational Gateway (`/welcome`)
+- **Community Introduction**: Explains the core purpose of Mahallu Qard Hasan Circles, citing Quran 57:11 and 2:282.
+- **Interactive Anti-Riba Comparison Calculator**: Live comparison demonstrating the cost of conventional microfinance (24%–36% APR + fees) vs. 100% zero-interest, zero-fee community lending.
+- **The 4 Pillars Breakdown**: Mutual Pooling, Dignified Borrowing, Guarantor Vouching (*Kafalah*), and Cryptographic Ledger (*Amanah*).
+- **FAQ Accordion**: Comprehensive answers to questions on Shariah compliance, default handling, and transparency.
+
+### 6. 🔐 Complete Authentication System (`/auth` & Global Auth Modal)
+- **Firebase Authentication**: Full integration with Email/Password and one-click Google OAuth.
+- **Join Circle / Registration**: Easy registration with full name, email, role selection, and Mahallu invite code (`MAHALLU-2026`).
+- **Password Reset Flow**: Integrated password reset email sender via Firebase `sendPasswordResetEmail`.
+- **Instant Demo Persona Switcher**: One-click preset authentication as *Committee Admin*, *Member*, *Guarantor*, or *Auditor*.
+- **Live Auth Synchronization**: Seamless real-time state sync across Firebase Auth, Firestore user profiles, and React Context.
+
+### 7. ⚡ 5-Minute Guided Live Demo Tour
 - A built-in interactive tour for judges and evaluators demonstrating Rahim's ₹30,000 surgery loan story step-by-step:
   1. *Pool Solvency Overview* (₹1,50,000)
   2. *Rahim's Medical Request*
@@ -69,9 +82,8 @@ These rules are strictly validated by the application logic:
   5. *Zero-Interest Installment Repayment*
   6. *Anti-Riba Fee Rejection Demonstration*
 
-### 6. 🔥 Firebase Database & Authentication
-- **Firebase Auth**: Email/Password and Google Sign-In with automated user profile synchronization.
-- **Firestore DB**: Real-time cloud persistence across `circles`, `users`, `memberships`, `contributions`, `loans`, `installments`, and `ledger`.
+### 8. 🔥 Firebase Cloud Database (Firestore)
+- **Firestore DB**: Cloud persistence across `circles`, `users`, `memberships`, `contributions`, `loans`, `installments`, and `ledger`.
 - **One-Click Firestore Sync / Re-seed**: Sync or reset collections directly from the Settings page.
 
 ---

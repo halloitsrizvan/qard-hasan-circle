@@ -10,9 +10,12 @@ interface DemoContextValue {
   dark: boolean;
   toggleTheme: () => void;
   isFirebaseUser: boolean;
+  authModalOpen: boolean;
+  setAuthModalOpen: (open: boolean) => void;
   signInWithEmail: (email: string, pass: string) => Promise<User>;
   signUpWithEmail: (email: string, pass: string, name: string, role?: Role) => Promise<User>;
   signInWithGoogle: () => Promise<User>;
+  resetPassword: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   syncWithFirestore: (force?: boolean) => Promise<{ success: boolean; message: string }>;
   refreshData: () => Promise<void>;
@@ -28,6 +31,7 @@ export function DemoProvider({ children }: { children: ReactNode }) {
   const [dark, setDark] = useState(false);
   const [ready, setReady] = useState(false);
   const [isFirebaseUser, setIsFirebaseUser] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
 
   // Restore local demo preferences after hydration to prevent SSR mismatches
   useEffect(() => {
@@ -139,9 +143,12 @@ export function DemoProvider({ children }: { children: ReactNode }) {
         dark,
         toggleTheme: () => setDark((v) => !v),
         isFirebaseUser,
+        authModalOpen,
+        setAuthModalOpen,
         signInWithEmail: handleSignInWithEmail,
         signUpWithEmail: handleSignUpWithEmail,
         signInWithGoogle: handleSignInWithGoogle,
+        resetPassword: (email: string) => authService.resetPassword(email),
         signOut: handleSignOut,
         syncWithFirestore,
         refreshData

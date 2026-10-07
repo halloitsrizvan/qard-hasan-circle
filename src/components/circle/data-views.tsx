@@ -504,14 +504,17 @@ export function MembersView() {
       </div>
 
       {joinModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl">
+        <div
+          onClick={(e) => e.target === e.currentTarget && setJoinModalOpen(false)}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs animate-in fade-in-0"
+        >
+          <div className="relative max-h-[85vh] w-full max-w-md overflow-y-auto rounded-3xl border bg-card p-6 shadow-2xl animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b pb-4">
               <div className="flex items-center gap-2 text-primary">
                 <UserPlus size={20} />
                 <h2 className="font-display text-xl">Join Mahallu Circle</h2>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setJoinModalOpen(false)}>
+              <Button variant="ghost" size="icon" onClick={() => setJoinModalOpen(false)} aria-label="Close modal">
                 <XCircle size={18} />
               </Button>
             </div>
@@ -561,7 +564,7 @@ export function MembersView() {
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-3 border-t">
                 <Button type="button" variant="outline" onClick={() => setJoinModalOpen(false)}>
                   Cancel
                 </Button>

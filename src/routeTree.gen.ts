@@ -10,17 +10,25 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommitteeRouteImport } from './routes/committee'
 import { Route as ContributionsRouteImport } from './routes/contributions'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LedgerRouteImport } from './routes/ledger'
 import { Route as LoansRouteImport } from './routes/loans'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CommitteeRoute = CommitteeRouteImport.update({
@@ -31,6 +39,11 @@ const CommitteeRoute = CommitteeRouteImport.update({
 const ContributionsRoute = ContributionsRouteImport.update({
   id: '/contributions',
   path: '/contributions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LedgerRoute = LedgerRouteImport.update({
@@ -58,80 +71,106 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/committee': typeof CommitteeRoute
   '/contributions': typeof ContributionsRoute
+  '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/loans': typeof LoansRoute
   '/members': typeof MembersRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
+  '/welcome': typeof WelcomeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/committee': typeof CommitteeRoute
   '/contributions': typeof ContributionsRoute
+  '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/loans': typeof LoansRoute
   '/members': typeof MembersRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
+  '/welcome': typeof WelcomeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/committee': typeof CommitteeRoute
   '/contributions': typeof ContributionsRoute
+  '/dashboard': typeof DashboardRoute
   '/ledger': typeof LedgerRoute
   '/loans': typeof LoansRoute
   '/members': typeof MembersRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
+  '/welcome': typeof WelcomeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/auth'
     | '/committee'
     | '/contributions'
+    | '/dashboard'
     | '/ledger'
     | '/loans'
     | '/members'
     | '/rules'
     | '/settings'
+    | '/welcome'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/auth'
     | '/committee'
     | '/contributions'
+    | '/dashboard'
     | '/ledger'
     | '/loans'
     | '/members'
     | '/rules'
     | '/settings'
+    | '/welcome'
   id:
     | '__root__'
     | '/'
+    | '/auth'
     | '/committee'
     | '/contributions'
+    | '/dashboard'
     | '/ledger'
     | '/loans'
     | '/members'
     | '/rules'
     | '/settings'
+    | '/welcome'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthRoute: typeof AuthRoute
   CommitteeRoute: typeof CommitteeRoute
   ContributionsRoute: typeof ContributionsRoute
+  DashboardRoute: typeof DashboardRoute
   LedgerRoute: typeof LedgerRoute
   LoansRoute: typeof LoansRoute
   MembersRoute: typeof MembersRoute
   RulesRoute: typeof RulesRoute
   SettingsRoute: typeof SettingsRoute
+  WelcomeRoute: typeof WelcomeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -141,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/committee': {
@@ -155,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/contributions'
       fullPath: '/contributions'
       preLoaderRoute: typeof ContributionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ledger': {
@@ -192,18 +245,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthRoute: AuthRoute,
   CommitteeRoute: CommitteeRoute,
   ContributionsRoute: ContributionsRoute,
+  DashboardRoute: DashboardRoute,
   LedgerRoute: LedgerRoute,
   LoansRoute: LoansRoute,
   MembersRoute: MembersRoute,
   RulesRoute: RulesRoute,
   SettingsRoute: SettingsRoute,
+  WelcomeRoute: WelcomeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,27 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  HeartHandshake,
   ShieldCheck,
   AlertTriangle,
   CheckCircle2,
   HandCoins,
   Wallet,
   Sparkles,
-  Info,
-  Calendar,
-  UserCheck,
   X,
   ArrowRight,
-  RotateCcw
+  RotateCcw,
+  HeartHandshake,
+  Coins
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Money } from '@/components/shared';
-import { loanService, contributionService, circleService } from '@/lib/services';
+import { loanService, contributionService } from '@/lib/services';
 import { useDemo } from '@/lib/demo-context';
 import type { Loan, User, Membership } from '@/lib/types';
 import { toast } from 'sonner';
+
+// Reusable custom hook for modal accessibility (Escape key, body scroll lock & portal mounting)
+function useModalHelper(isOpen: boolean, onClose: () => void) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, onClose]);
+
+  return mounted;
+}
 
 interface RequestLoanModalProps {
   isOpen: boolean;
@@ -40,6 +64,7 @@ export function RequestLoanModal({
 }: RequestLoanModalProps) {
   const { user } = useDemo();
   const queryClient = useQueryClient();
+  const mounted = useModalHelper(isOpen, onClose);
 
   const [amount, setAmount] = useState(30000);
   const [purpose, setPurpose] = useState('Mother’s surgery (Medical emergency)');
@@ -48,7 +73,7 @@ export function RequestLoanModal({
   const [attemptFee, setAttemptFee] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const purposeOptions = [
     'Mother’s surgery (Medical emergency)',
@@ -59,7 +84,6 @@ export function RequestLoanModal({
   ];
 
   const eligibleGuarantors = members.filter((m) => m.user.id !== user?.id);
-  const monthlyInstallment = Math.round(amount / months);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,25 +121,35 @@ export function RequestLoanModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 p-4 backdrop-blur-xs">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border bg-card p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b pb-4">
-          <div className="flex items-center gap-2 text-primary">
-            <HandCoins size={22} />
-            <h2 className="font-display text-xl">Request an Interest-Free Loan</h2>
+  return createPortal(
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-md animate-in fade-in-0 duration-200"
+    >
+      <div className="relative flex max-h-[92vh] w-full max-w-lg flex-col rounded-2xl border border-emerald-500/30 bg-[#16221c] text-foreground shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] ring-1 ring-white/10 overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border/60 bg-muted/20 px-6 py-4">
+          <div className="flex items-center gap-2.5 text-primary">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <HandCoins size={20} />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-semibold text-foreground">Request an Interest-Free Loan</h2>
+              <p className="text-[11px] text-muted-foreground">Zero interest, 100% principal repayable</p>
+            </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close modal">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close modal" className="size-8 rounded-lg hover:bg-muted/50">
             <X size={18} />
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-5">
+        {/* Modal Scrollable Body */}
+        <form id="loan-request-form" onSubmit={handleSubmit} className="flex flex-col overflow-y-auto px-6 py-5 space-y-4">
           <div>
             <div className="flex justify-between text-xs font-medium">
-              <span>Loan Amount</span>
+              <span className="text-foreground">Loan Amount</span>
               <span className="font-semibold text-primary">
-                <Money amount={amount} /> (Max: <Money amount={maxLoan} />)
+                <Money amount={amount} /> <span className="text-muted-foreground">(Max: <Money amount={maxLoan} />)</span>
               </span>
             </div>
             <input
@@ -125,9 +159,9 @@ export function RequestLoanModal({
               step={1000}
               value={amount}
               onChange={(e) => setAmount(Number(e.target.value))}
-              className="mt-2 w-full accent-primary"
+              className="mt-2.5 h-2 w-full cursor-pointer rounded-lg bg-secondary accent-primary"
             />
-            <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+            <div className="mt-1 flex justify-between text-[11px] font-medium text-muted-foreground">
               <span>₹5,000</span>
               <span>₹25,000</span>
               <span>₹50,000</span>
@@ -135,11 +169,11 @@ export function RequestLoanModal({
           </div>
 
           <div>
-            <label className="text-xs font-medium">Purpose Category</label>
+            <label className="text-xs font-medium text-foreground">Purpose Category</label>
             <select
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
-              className="mt-1.5 block w-full rounded-xl border bg-background px-3 py-2.5 text-xs font-medium"
+              className="mt-1.5 block w-full rounded-xl border border-border/80 bg-background/90 px-3 py-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
             >
               {purposeOptions.map((p) => (
                 <option key={p} value={p}>
@@ -151,26 +185,26 @@ export function RequestLoanModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium">Repayment Term</label>
+              <label className="text-xs font-medium text-foreground">Repayment Term</label>
               <select
                 value={months}
                 onChange={(e) => setMonths(Number(e.target.value))}
-                className="mt-1.5 block w-full rounded-xl border bg-background px-3 py-2.5 text-xs font-medium"
+                className="mt-1.5 block w-full rounded-xl border border-border/80 bg-background/90 px-3 py-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 {[3, 4, 6, 8, 10, 12].map((m) => (
                   <option key={m} value={m}>
-                    {m} months (₹{Math.round(amount / m)}/mo)
+                    {m} months (₹{Math.round(amount / m).toLocaleString('en-IN')}/mo)
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="text-xs font-medium">Community Guarantor</label>
+              <label className="text-xs font-medium text-foreground">Community Guarantor</label>
               <select
                 value={guarantorId}
                 onChange={(e) => setGuarantorId(e.target.value)}
-                className="mt-1.5 block w-full rounded-xl border bg-background px-3 py-2.5 text-xs font-medium"
+                className="mt-1.5 block w-full rounded-xl border border-border/80 bg-background/90 px-3 py-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 {eligibleGuarantors.map((g) => (
                   <option key={g.user.id} value={g.user.id}>
@@ -182,8 +216,8 @@ export function RequestLoanModal({
           </div>
 
           {/* Anti-Riba Shariah Breakdown */}
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+          <div className="rounded-xl border border-primary/30 bg-primary/10 p-4">
+            <div className="flex items-center gap-2 text-xs font-semibold text-primary">
               <ShieldCheck size={16} />
               <span>Shariah-Enforced Calculation (Quran 2:282)</span>
             </div>
@@ -194,15 +228,15 @@ export function RequestLoanModal({
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Interest / Riba (0.0%):</span>
-                <span className="font-semibold text-emerald-600">₹0.00</span>
+                <span className="font-semibold text-emerald-400">₹0.00</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Processing fee:</span>
-                <span className="font-semibold text-emerald-600">{attemptFee ? '₹500 (PROHIBITED)' : '₹0.00'}</span>
+                <span className="font-semibold text-emerald-400">{attemptFee ? '₹500 (PROHIBITED)' : '₹0.00'}</span>
               </div>
-              <div className="flex justify-between border-t pt-2 font-medium text-foreground">
+              <div className="flex justify-between border-t border-border/60 pt-2 font-medium text-foreground">
                 <span>Total repayable:</span>
-                <span className="text-sm font-semibold text-primary">
+                <span className="text-sm font-bold text-primary">
                   <Money amount={amount + (attemptFee ? 500 : 0)} />
                 </span>
               </div>
@@ -210,16 +244,16 @@ export function RequestLoanModal({
           </div>
 
           {/* Interactive Anti-Riba Tester */}
-          <div className="rounded-xl border border-dashed p-3">
+          <div className="rounded-xl border border-dashed border-rose-500/30 bg-rose-500/5 p-3">
             <label className="flex cursor-pointer items-start gap-2.5">
               <input
                 type="checkbox"
                 checked={attemptFee}
                 onChange={(e) => setAttemptFee(e.target.checked)}
-                className="mt-0.5 size-4 rounded accent-rose-600"
+                className="mt-0.5 size-4 rounded accent-rose-500"
               />
               <div className="text-[11px]">
-                <span className="font-medium text-rose-600 dark:text-rose-400">
+                <span className="font-semibold text-rose-400">
                   Demo Test: Try adding a ₹500 "processing fee"
                 </span>
                 <p className="mt-0.5 text-muted-foreground">
@@ -228,25 +262,27 @@ export function RequestLoanModal({
               </div>
             </label>
             {attemptFee && (
-              <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-rose-500/10 p-2 text-[10px] text-rose-600 dark:text-rose-400">
-                <AlertTriangle size={14} className="shrink-0" />
-                <span>Error: Any fee benefiting the lender converts the loan into Riba.</span>
+              <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-rose-500/20 p-2 text-[11px] text-rose-300 font-medium">
+                <AlertTriangle size={14} className="shrink-0 text-rose-400" />
+                <span>Violation: Any fee benefiting the lender converts the loan into Riba.</span>
               </div>
             )}
           </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting || attemptFee} className="gap-2">
-              <HandCoins size={16} />
-              {isSubmitting ? 'Submitting...' : 'Submit Loan Request'}
-            </Button>
-          </div>
         </form>
+
+        {/* Modal Sticky Footer */}
+        <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-border/60 bg-muted/30 px-6 py-4">
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting} className="rounded-xl border-border/80">
+            Cancel
+          </Button>
+          <Button form="loan-request-form" type="submit" disabled={isSubmitting || attemptFee} className="gap-2 rounded-xl bg-primary px-5 font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90">
+            <HandCoins size={16} />
+            {isSubmitting ? 'Submitting...' : 'Submit Loan Request'}
+          </Button>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -258,12 +294,13 @@ interface ContributeModalProps {
 export function ContributeModal({ isOpen, onClose }: ContributeModalProps) {
   const { user } = useDemo();
   const queryClient = useQueryClient();
+  const mounted = useModalHelper(isOpen, onClose);
 
   const [amount, setAmount] = useState(15000);
   const [type, setType] = useState<'Regular' | 'Voluntary'>('Regular');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const presets = [500, 1000, 5000, 15000, 30000];
 
@@ -292,64 +329,99 @@ export function ContributeModal({ isOpen, onClose }: ContributeModalProps) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b pb-4">
-          <div className="flex items-center gap-2 text-primary">
-            <Wallet size={22} />
-            <h2 className="font-display text-xl">Contribute to the Pool</h2>
+  return createPortal(
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-md animate-in fade-in-0 duration-200"
+    >
+      <div className="relative flex max-h-[92vh] w-full max-w-md flex-col rounded-2xl border border-emerald-500/30 bg-[#16221c] text-foreground shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] ring-1 ring-white/10 overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border/60 bg-muted/20 px-6 py-4">
+          <div className="flex items-center gap-2.5 text-primary">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
+              <Wallet size={20} />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-semibold text-foreground">Contribute to the Pool</h2>
+              <p className="text-[11px] text-muted-foreground">Strengthen the Mahallu mutual fund</p>
+            </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close modal">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close modal" className="size-8 rounded-lg hover:bg-muted/50">
             <X size={18} />
           </Button>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        {/* Modal Scrollable Body */}
+        <form id="contribute-form" onSubmit={handleSubmit} className="flex flex-col overflow-y-auto px-6 py-5 space-y-4">
           <div>
-            <label className="text-xs font-medium">Contribution Type</label>
-            <div className="mt-1.5 grid grid-cols-2 gap-2">
+            <label className="text-xs font-semibold text-foreground">Select Contribution Type</label>
+            <div className="mt-2 grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => setType('Regular')}
-                className={`rounded-xl border p-3 text-left transition-colors ${
-                  type === 'Regular' ? 'border-primary bg-primary/10 text-primary' : 'bg-background hover:bg-secondary'
+                className={`relative rounded-xl border p-3.5 text-left transition-all ${
+                  type === 'Regular'
+                    ? 'border-primary bg-primary/15 text-foreground ring-1 ring-primary shadow-sm'
+                    : 'border-border/70 bg-background/60 hover:bg-secondary/40 text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <p className="text-xs font-semibold">Regular Pool</p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">Monthly community fund</p>
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
+                  <Coins size={15} className={type === 'Regular' ? 'text-primary' : 'text-muted-foreground'} />
+                  <span>Regular Pool</span>
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground leading-tight">Monthly community commitment</p>
+                {type === 'Regular' && (
+                  <div className="absolute top-2 right-2 size-2 rounded-full bg-primary" />
+                )}
               </button>
+
               <button
                 type="button"
                 onClick={() => setType('Voluntary')}
-                className={`rounded-xl border p-3 text-left transition-colors ${
-                  type === 'Voluntary' ? 'border-primary bg-primary/10 text-primary' : 'bg-background hover:bg-secondary'
+                className={`relative rounded-xl border p-3.5 text-left transition-all ${
+                  type === 'Voluntary'
+                    ? 'border-amber-500 bg-amber-500/15 text-foreground ring-1 ring-amber-500 shadow-sm'
+                    : 'border-border/70 bg-background/60 hover:bg-secondary/40 text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <p className="text-xs font-semibold">Sadaqah Jariyah</p>
-                <p className="mt-0.5 text-[10px] text-muted-foreground">Voluntary gift to pool</p>
+                <div className="flex items-center gap-1.5 font-semibold text-xs text-foreground">
+                  <HeartHandshake size={15} className={type === 'Voluntary' ? 'text-amber-400' : 'text-muted-foreground'} />
+                  <span>Sadaqah Jariyah</span>
+                </div>
+                <p className="mt-1 text-[10px] text-muted-foreground leading-tight">Voluntary continuous charity</p>
+                {type === 'Voluntary' && (
+                  <div className="absolute top-2 right-2 size-2 rounded-full bg-amber-400" />
+                )}
               </button>
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-medium">Amount (₹)</label>
-            <Input
-              type="number"
-              min={100}
-              step={100}
-              value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-              className="mt-1.5 h-10 text-sm font-semibold"
-            />
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="flex justify-between items-center text-xs font-semibold text-foreground">
+              <label>Amount (₹)</label>
+              <span className="text-primary font-bold">₹{amount.toLocaleString('en-IN')}</span>
+            </div>
+            <div className="relative mt-2">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-semibold text-muted-foreground">₹</span>
+              <Input
+                type="number"
+                min={100}
+                step={100}
+                value={amount}
+                onChange={(e) => setAmount(Number(e.target.value))}
+                className="h-11 rounded-xl border-border/80 bg-background/90 pl-8 text-base font-bold text-foreground focus-visible:ring-1 focus-visible:ring-primary"
+              />
+            </div>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               {presets.map((p) => (
                 <button
                   key={p}
                   type="button"
                   onClick={() => setAmount(p)}
-                  className={`rounded-lg border px-2.5 py-1 text-xs transition-colors ${
-                    amount === p ? 'bg-primary text-primary-foreground' : 'bg-secondary text-muted-foreground'
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                    amount === p
+                      ? 'border-primary bg-primary text-primary-foreground shadow-sm shadow-primary/20 font-semibold'
+                      : 'border-border/70 bg-secondary/50 text-foreground hover:bg-secondary hover:border-border'
                   }`}
                 >
                   ₹{p.toLocaleString('en-IN')}
@@ -358,23 +430,35 @@ export function ContributeModal({ isOpen, onClose }: ContributeModalProps) {
             </div>
           </div>
 
-          <div className="rounded-xl border bg-secondary/50 p-3 text-[11px] leading-relaxed text-muted-foreground">
-            <span className="font-semibold text-foreground">Barakah in community care:</span> 100% of your
-            contribution directly strengthens the emergency lending pool for families in need.
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="gap-2">
-              <Wallet size={16} />
-              {isSubmitting ? 'Confirming...' : 'Confirm Contribution'}
-            </Button>
+          <div className="rounded-xl border border-primary/25 bg-primary/10 p-3.5 text-xs leading-relaxed text-emerald-200">
+            <div className="flex items-center gap-1.5 font-semibold text-primary text-[11px] mb-0.5">
+              <Sparkles size={14} />
+              <span>Barakah in Community Care</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              100% of your contribution directly fuels the emergency lending pool for families in need. Zero overheads, zero interest.
+            </p>
           </div>
         </form>
+
+        {/* Modal Sticky Footer */}
+        <div className="flex shrink-0 items-center justify-end gap-2.5 border-t border-border/60 bg-muted/30 px-6 py-4">
+          <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting} className="rounded-xl border-border/80">
+            Cancel
+          </Button>
+          <Button
+            form="contribute-form"
+            type="submit"
+            disabled={isSubmitting || amount <= 0}
+            className="gap-2 rounded-xl bg-primary px-5 font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
+          >
+            <Wallet size={16} />
+            {isSubmitting ? 'Confirming...' : 'Confirm Contribution'}
+          </Button>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -386,11 +470,11 @@ interface LoanDetailModalProps {
 }
 
 export function LoanDetailModal({ loan, onClose, borrowerName, guarantorName }: LoanDetailModalProps) {
-  const { user, role } = useDemo();
   const queryClient = useQueryClient();
+  const mounted = useModalHelper(Boolean(loan), onClose);
   const [paying, setPaying] = useState<string | null>(null);
 
-  if (!loan) return null;
+  if (!loan || !mounted) return null;
 
   const monthly = Math.round(loan.amount / loan.months);
   const remaining = loan.amount - loan.repaid;
@@ -414,69 +498,79 @@ export function LoanDetailModal({ loan, onClose, borrowerName, guarantorName }: 
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 p-4 backdrop-blur-xs">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border bg-card p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b pb-4">
+  return createPortal(
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-md animate-in fade-in-0 duration-200"
+    >
+      <div className="relative flex max-h-[92vh] w-full max-w-lg flex-col rounded-2xl border border-emerald-500/30 bg-[#16221c] text-foreground shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] ring-1 ring-white/10 overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border/60 bg-muted/20 px-6 py-4">
           <div>
-            <span className="text-[10px] font-semibold tracking-wider text-muted-foreground">{loan.id}</span>
-            <h2 className="font-display text-xl">{borrowerName}</h2>
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{loan.id}</span>
+            <h2 className="font-display text-lg font-semibold text-foreground">{borrowerName}</h2>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close modal">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close modal" className="size-8 rounded-lg hover:bg-muted/50">
             <X size={18} />
           </Button>
         </div>
 
-        <div className="mt-5 space-y-4">
-          <div className="grid grid-cols-3 gap-2 rounded-2xl border bg-secondary/30 p-3 text-center">
+        {/* Modal Scrollable Body */}
+        <div className="flex flex-col overflow-y-auto px-6 py-5 space-y-4">
+          <div className="grid grid-cols-3 gap-2.5 rounded-xl border border-border/80 bg-background/50 p-3.5 text-center">
             <div>
-              <p className="text-[10px] text-muted-foreground">Principal</p>
-              <p className="mt-1 font-semibold"><Money amount={loan.amount} /></p>
+              <p className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">Principal</p>
+              <p className="mt-1 font-bold text-foreground"><Money amount={loan.amount} /></p>
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground">Repaid</p>
-              <p className="mt-1 font-semibold text-primary"><Money amount={loan.repaid} /></p>
+              <p className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">Repaid</p>
+              <p className="mt-1 font-bold text-primary"><Money amount={loan.repaid} /></p>
             </div>
             <div>
-              <p className="text-[10px] text-muted-foreground">Remaining</p>
-              <p className="mt-1 font-semibold text-foreground"><Money amount={remaining} /></p>
+              <p className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground">Remaining</p>
+              <p className="mt-1 font-bold text-foreground"><Money amount={remaining} /></p>
             </div>
           </div>
 
           <div className="space-y-2 text-xs">
-            <div className="flex justify-between border-b py-2">
+            <div className="flex justify-between border-b border-border/50 py-2">
               <span className="text-muted-foreground">Purpose</span>
-              <span className="font-medium">{loan.purpose}</span>
+              <span className="font-medium text-foreground">{loan.purpose}</span>
             </div>
-            <div className="flex justify-between border-b py-2">
+            <div className="flex justify-between border-b border-border/50 py-2">
               <span className="text-muted-foreground">Guarantor</span>
-              <span className="font-medium">{guarantorName || 'Assigned Member'}</span>
+              <span className="font-medium text-foreground">{guarantorName || 'Assigned Member'}</span>
             </div>
-            <div className="flex justify-between border-b py-2">
+            <div className="flex justify-between border-b border-border/50 py-2">
               <span className="text-muted-foreground">Term</span>
-              <span className="font-medium">{loan.months} months (₹{monthly}/month)</span>
+              <span className="font-medium text-foreground">{loan.months} months (₹{monthly.toLocaleString('en-IN')}/month)</span>
             </div>
-            <div className="flex justify-between border-b py-2">
+            <div className="flex justify-between border-b border-border/50 py-2">
               <span className="text-muted-foreground">Interest / Fees</span>
-              <span className="font-medium text-emerald-600">₹0.00 (Riba-free)</span>
+              <span className="font-semibold text-emerald-400">₹0.00 (100% Riba-free)</span>
             </div>
           </div>
+        </div>
 
+        {/* Modal Sticky Footer */}
+        <div className="flex shrink-0 items-center justify-between border-t border-border/60 bg-muted/30 px-6 py-4">
+          <Button type="button" variant="outline" onClick={onClose} className="rounded-xl border-border/80">
+            Close
+          </Button>
           {loan.status === 'Active' && (
-            <div className="pt-2">
-              <Button
-                onClick={handlePayInstallment}
-                disabled={paying === loan.id || remaining <= 0}
-                className="w-full gap-2"
-              >
-                <RotateCcw size={15} />
-                {paying === loan.id ? 'Recording payment...' : `Pay Next Monthly Installment (₹${monthly})`}
-              </Button>
-            </div>
+            <Button
+              onClick={handlePayInstallment}
+              disabled={paying === loan.id || remaining <= 0}
+              className="gap-2 rounded-xl bg-primary px-5 font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90"
+            >
+              <RotateCcw size={15} />
+              {paying === loan.id ? 'Recording payment...' : `Pay Monthly Installment (₹${monthly.toLocaleString('en-IN')})`}
+            </Button>
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -486,12 +580,13 @@ interface DemoTourModalProps {
 }
 
 export function DemoTourModal({ isOpen, onClose }: DemoTourModalProps) {
-  const { switchRole, role } = useDemo();
+  const { switchRole } = useDemo();
   const queryClient = useQueryClient();
+  const mounted = useModalHelper(isOpen, onClose);
   const [step, setStep] = useState(1);
   const [executing, setExecuting] = useState(false);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const tourSteps = [
     {
@@ -505,7 +600,7 @@ export function DemoTourModal({ isOpen, onClose }: DemoTourModalProps) {
         await loanService.request({
           userId: 'u2',
           amount: 30000,
-          purpose: 'Mother’s urgent surgery',
+          purpose: 'Mother’s surgery (Medical emergency)',
           months: 6,
           guarantorId: 'u4'
         });
@@ -598,51 +693,69 @@ export function DemoTourModal({ isOpen, onClose }: DemoTourModalProps) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/25 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-lg rounded-3xl border bg-card p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b pb-4">
-          <div className="flex items-center gap-2 text-primary">
-            <Sparkles size={20} className="text-gold" />
-            <h2 className="font-display text-xl">5-Minute Live Demo Tour</h2>
+  return createPortal(
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-md animate-in fade-in-0 duration-200"
+    >
+      <div className="relative flex max-h-[92vh] w-full max-w-lg flex-col rounded-2xl border border-emerald-500/30 bg-[#16221c] text-foreground shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9)] ring-1 ring-white/10 overflow-hidden">
+        {/* Modal Header */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border/60 bg-muted/20 px-6 py-4">
+          <div className="flex items-center gap-2.5 text-primary">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-gold/15 text-gold">
+              <Sparkles size={20} />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-semibold text-foreground">5-Minute Live Demo Tour</h2>
+              <p className="text-[11px] text-muted-foreground">Interactive step-by-step walkthrough</p>
+            </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close tour">
+          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close tour" className="size-8 rounded-lg hover:bg-muted/50">
             <X size={18} />
           </Button>
         </div>
 
-        <div className="mt-5 space-y-4">
+        {/* Modal Scrollable Body */}
+        <div className="flex flex-col overflow-y-auto px-6 py-5 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="rounded-full bg-secondary px-3 py-1 text-[11px] font-semibold text-primary">
+            <span className="rounded-full bg-primary/20 border border-primary/30 px-3 py-1 text-[11px] font-semibold text-primary">
               Step {step} of {tourSteps.length}
             </span>
-            <span className="text-xs text-muted-foreground">Actor: {current.actor}</span>
+            <span className="text-xs font-medium text-muted-foreground">Actor: <span className="text-foreground">{current.actor}</span></span>
           </div>
 
-          <h3 className="font-display text-lg">{current.title}</h3>
+          <h3 className="font-display text-base font-semibold text-foreground">{current.title}</h3>
           <p className="text-xs leading-relaxed text-muted-foreground">{current.desc}</p>
 
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 text-xs text-primary">
+          <div className="rounded-xl border border-primary/25 bg-primary/10 p-3.5 text-xs text-primary">
             <div className="flex items-center gap-1.5 font-semibold">
               <CheckCircle2 size={16} />
-              <span>Storyline Progress</span>
+              <span>Real-Time State Execution</span>
             </div>
             <p className="mt-1 text-[11px] text-muted-foreground">
               Clicking below will execute this step automatically and update the database & ledger in real time.
             </p>
           </div>
+        </div>
 
-          <div className="flex justify-between pt-3">
-            <Button variant="ghost" size="sm" onClick={() => setStep((s) => Math.max(1, s - 1))} disabled={step === 1 || executing}>
-              Previous
-            </Button>
-            <Button onClick={handleNext} disabled={executing} className="gap-2">
-              {executing ? 'Executing...' : current.actionLabel}
-              <ArrowRight size={14} />
-            </Button>
-          </div>
+        {/* Modal Sticky Footer */}
+        <div className="flex shrink-0 items-center justify-between border-t border-border/60 bg-muted/30 px-6 py-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setStep((s) => Math.max(1, s - 1))}
+            disabled={step === 1 || executing}
+            className="rounded-xl"
+          >
+            Previous
+          </Button>
+          <Button onClick={handleNext} disabled={executing} className="gap-2 rounded-xl bg-primary px-5 font-semibold text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90">
+            {executing ? 'Executing...' : current.actionLabel}
+            <ArrowRight size={14} />
+          </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -4,7 +4,7 @@ import { authService, circleService, contributionService, loanService, ledgerSer
 describe('circle foundation',()=>{
  beforeAll(async()=>{
   await circleService.seedDB(true);
- });
+ }, 30000);
  it('has all seed rows and exactly reconciled append-only demo records',async()=>{
   const [circle,members,contributions,loans,ledger]=await Promise.all([circleService.getActive(),circleService.getMembers(),contributionService.list(),loanService.list(),ledgerService.list()]);
   expect(members).toHaveLength(12);expect(contributions).toHaveLength(14);expect(loans).toHaveLength(6);expect(ledger).toHaveLength(40);

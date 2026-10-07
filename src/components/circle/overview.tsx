@@ -97,7 +97,6 @@ export function OverviewPage() {
           </div>
           <h1 className="font-display text-[30px] leading-tight sm:text-[34px]">
             Assalamu alaikum, {user?.name.split(' ')[0] ?? 'Abdul'}
-            <span className="ml-2 font-arabic text-gold">.</span>
           </h1>
           <p className="mt-2 text-xs text-muted-foreground">
             {role === 'Committee Admin'
@@ -110,16 +109,7 @@ export function OverviewPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDemoTourOpen(true)}
-            className="gap-1.5 border-gold/40 bg-gold-soft/60 text-xs font-medium text-gold-foreground hover:bg-gold-soft"
-          >
-            <Sparkles size={14} className="text-gold" />
-            {t.quickDemoTour}
-          </Button>
-          <span className="hidden rounded-md border bg-card px-3 py-2 text-[10px] text-muted-foreground sm:block">
+          <span className="rounded-md border bg-card px-3 py-2 text-[10px] text-muted-foreground">
             Tuesday, 6 October 2026
           </span>
         </div>

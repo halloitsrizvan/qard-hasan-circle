@@ -6,6 +6,7 @@ import {
   signOut as fbSignOut,
   onAuthStateChanged,
   updateProfile,
+  sendPasswordResetEmail,
   type User as FirebaseUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -18,6 +19,7 @@ export interface AuthService {
   signInWithEmail(email: string, password: string): Promise<User>;
   signUpWithEmail(email: string, password: string, name: string, role?: Role): Promise<User>;
   signInWithGoogle(): Promise<User>;
+  resetPassword(email: string): Promise<void>;
   signOut(): Promise<void>;
   getCurrentUser(): Promise<User | null>;
   subscribeToAuth(callback: (user: User | null) => void): () => void;
@@ -78,6 +80,10 @@ export const authService: AuthService = {
     const cred = await signInWithPopup(auth, provider);
     const appUser = mapFirebaseUserToAppUser(cred.user);
     return syncUserToFirestore(appUser);
+  },
+
+  async resetPassword(email: string): Promise<void> {
+    await sendPasswordResetEmail(auth, email);
   },
 
   async signOut(): Promise<void> {

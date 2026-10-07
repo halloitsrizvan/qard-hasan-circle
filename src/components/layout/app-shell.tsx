@@ -22,18 +22,20 @@ import {
   Wallet,
   X,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  LogIn
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useDemo } from '@/lib/demo-context';
 import { useI18n, type Language } from '@/lib/i18n';
 import { DemoTourModal } from '@/components/circle/modals';
+import { AuthModal } from '@/components/auth/auth-modal';
 import type { Role } from '@/lib/types';
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <Link to="/" className="flex items-center gap-2.5">
+    <Link to="/dashboard" className="flex items-center gap-2.5">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
         <HeartHandshake size={23} strokeWidth={1.6} />
       </span>
@@ -48,7 +50,7 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { circle, user, role, dark, toggleTheme, switchRole } = useDemo();
+  const { circle, user, role, dark, toggleTheme, switchRole, isFirebaseUser, authModalOpen, setAuthModalOpen } = useDemo();
   const { language, setLanguage, t } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -58,8 +60,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [switchOpen, setSwitchOpen] = useState(false);
   const [demoTourOpen, setDemoTourOpen] = useState(false);
 
+  // If visiting public landing page or auth page, render without dashboard chrome
+  if (pathname === '/' || pathname === '/welcome' || pathname === '/auth') {
+    return (
+      <>
+        {children}
+        <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
+      </>
+    );
+  }
+
   const navigation = [
-    { to: '/' as const, label: t.circleOverview, icon: LayoutDashboard },
+    { to: '/dashboard' as const, label: t.circleOverview, icon: LayoutDashboard },
     { to: '/contributions' as const, label: t.contributions, icon: Wallet },
     { to: '/loans' as const, label: t.loans, icon: HandCoins },
     { to: '/ledger' as const, label: t.ledger, icon: BookOpen },
@@ -75,14 +87,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   const pageTitles: Record<string, string> = {
-    '/': t.circleOverview,
+    '/dashboard': t.circleOverview,
     '/contributions': t.contributions,
     '/loans': t.loans,
     '/ledger': t.ledger,
     '/members': t.members,
     '/committee': t.committee,
     '/rules': t.rules,
-    '/settings': t.settings
+    '/settings': t.settings,
+    '/': 'Public Page',
+    '/welcome': 'Public Page'
   };
 
   const languages: { code: Language; label: string }[] = [
@@ -151,8 +165,14 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </nav>
 
-        <div className="my-5 mx-7 border-t" />
+        <div className="my-4 mx-7 border-t" />
         <nav aria-label="Circle preferences" className="space-y-1 px-4">
+          <Button asChild variant="ghost" className="sidebar-link relative" data-active={pathname === '/' || pathname === '/welcome'}>
+            <Link to="/">
+              <Globe className="mr-1" />
+              Public Page
+            </Link>
+          </Button>
           <Button asChild variant="ghost" className="sidebar-link relative" data-active={pathname === '/rules'}>
             <Link to="/rules">
               <Leaf className="mr-1" />
@@ -190,20 +210,30 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="mt-4 border-t pt-4">
             <div className="flex items-center gap-2.5">
-              <span className="flex size-8 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-primary">
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="flex size-8 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-primary transition-transform hover:scale-105"
+                title="Manage account"
+              >
                 {user?.initials ?? 'AK'}
-              </span>
-              <div className="min-w-0 flex-1">
+              </button>
+              <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setAuthModalOpen(true)}>
                 <p className="truncate text-xs font-medium">{user?.name ?? 'Abdul Kareem'}</p>
-                <p className="mt-0.5 text-[9px] text-muted-foreground">{role}</p>
+                <div className="flex items-center gap-1">
+                  <p className="truncate text-[9px] text-muted-foreground">{role}</p>
+                  {isFirebaseUser && (
+                    <span className="size-1.5 rounded-full bg-emerald-500" title="Firebase User" />
+                  )}
+                </div>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
-                title="Switch demo profile"
-                aria-label="Switch demo profile"
+                title={isFirebaseUser ? 'Account Settings' : 'Switch demo profile'}
+                aria-label="Account Settings"
                 className="size-7"
-                onClick={() => setSwitchOpen(true)}
+                onClick={() => (isFirebaseUser ? setAuthModalOpen(true) : setSwitchOpen(true))}
               >
                 <LogOut size={14} />
               </Button>
@@ -304,14 +334,29 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             <div className="hidden h-6 border-l sm:block" />
 
-            <Button asChild variant="ghost" className="h-auto gap-2 rounded-full p-0">
-              <Link to="/settings" aria-label="Your profile">
-                <span className="flex size-8 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-primary">
-                  {user?.initials ?? 'AK'}
+            {isFirebaseUser ? (
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(true)}
+                className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+                title="Manage Firebase Account"
+              >
+                <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                  {user?.initials ?? 'U'}
                 </span>
-                <ChevronDown size={13} className="hidden text-muted-foreground sm:block" />
-              </Link>
-            </Button>
+                <span className="hidden sm:inline font-medium">{user?.name?.split(' ')[0]}</span>
+              </button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAuthModalOpen(true)}
+                className="gap-1.5 rounded-xl border-primary/30 text-xs font-semibold text-primary hover:bg-primary/10"
+              >
+                <LogIn size={13} />
+                <span>Sign In</span>
+              </Button>
+            )}
           </div>
         </header>
 
@@ -349,14 +394,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Demo Persona Switcher */}
       <Popover open={switchOpen} onOpenChange={setSwitchOpen}>
         <PopoverTrigger asChild>
-          <Button className="demo-switcher fixed bottom-20 right-5 z-50 h-11 gap-2 rounded-full border border-gold/35 bg-card px-4 text-foreground shadow-lg hover:bg-secondary lg:bottom-6 lg:right-7">
+          <Button className="demo-switcher fixed bottom-20 right-5 z-40 h-11 gap-2 rounded-full border border-gold/35 bg-card px-4 text-foreground shadow-lg hover:bg-secondary lg:bottom-6 lg:right-7">
             <ArrowLeftRight size={15} className="text-primary" />
             <span className="text-xs">{t.demoRole}</span>
             <span className="hidden border-l pl-2 text-[11px] text-muted-foreground sm:inline">{role}</span>
             <ChevronDown size={13} />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" side="top" className="mb-2 w-[300px] rounded-2xl p-2">
+        <PopoverContent align="end" side="top" className="mb-2 w-[300px] rounded-2xl p-2 z-40">
           <div className="px-3 py-3">
             <span className="text-[10px] font-semibold tracking-[.1em] text-muted-foreground">EXPLORE THE CIRCLE</span>
             <h2 className="mt-1 font-display text-lg">A different perspective</h2>
@@ -395,8 +440,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Help Modal */}
       {help && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 p-5 backdrop-blur-xs">
-          <div role="dialog" aria-modal="true" aria-labelledby="help-title" className="w-full max-w-sm rounded-2xl border bg-card p-6 shadow-2xl">
+        <div
+          onClick={(e) => e.target === e.currentTarget && setHelp(false)}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-5 backdrop-blur-xs animate-in fade-in-0"
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="help-title" className="w-full max-w-sm rounded-3xl border bg-card p-6 shadow-2xl animate-in zoom-in-95">
             <div className="flex items-center justify-between">
               <h2 id="help-title" className="font-display text-xl">Your community, here for you</h2>
               <Button variant="ghost" size="icon" aria-label="Close help" onClick={() => setHelp(false)}>
@@ -415,6 +463,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* 5-Min Demo Tour Modal */}
       <DemoTourModal isOpen={demoTourOpen} onClose={() => setDemoTourOpen(false)} />
+
+      {/* Global Auth Modal */}
+      <AuthModal isOpen={authModalOpen} onClose={() => setAuthModalOpen(false)} />
     </div>
   );
 }
