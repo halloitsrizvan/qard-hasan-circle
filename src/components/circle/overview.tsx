@@ -20,9 +20,12 @@ import {
   Banknote,
   ChevronDown,
   CirclePlus,
+  Coins,
   HandCoins,
   HeartHandshake,
+  Layers,
   MapPin,
+  Shield,
   ShieldCheck,
   Sparkles,
   Users,
@@ -68,6 +71,7 @@ export function OverviewPage() {
   const { data: loans } = useSuspenseQuery(circleQueries.loans);
   const { data: entries } = useSuspenseQuery(circleQueries.ledger);
   const { data: members } = useSuspenseQuery(circleQueries.members);
+  const { data: wealth } = useSuspenseQuery(circleQueries.wealth);
 
   const [period, setPeriod] = useState('12');
   const [requestModalOpen, setRequestModalOpen] = useState(false);
@@ -180,6 +184,34 @@ export function OverviewPage() {
           </div>
         </div>
       </section>
+
+      {/* Dual Pool 70-30 Governance Card */}
+      <div className="my-5 rounded-2xl border bg-card p-4 shadow-soft sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-secondary text-primary">
+              <Layers size={20} strokeWidth={1.7} />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-semibold text-foreground">Dual-Fund Architecture ({wealth.emergencyRatio}% Emergency / {wealth.wealthRatio}% Wealth & Chit)</p>
+                <span className="rounded-full border border-gold/30 bg-gold-soft px-2 py-0.5 text-[10px] font-medium text-gold-foreground">
+                  Round #{wealth.activeRound} Active
+                </span>
+              </div>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                <Money amount={wealth.emergencyPool} /> in 0% Qard emergency reserves · <Money amount={wealth.wealthPool} /> in rotating Chit & dividend fund
+              </p>
+            </div>
+          </div>
+
+          <Button asChild size="sm" variant="outline" className="gap-1.5 rounded-xl text-xs font-medium">
+            <Link to="/wealth">
+              Explore Wealth & Chit Pot <ArrowRight size={13} />
+            </Link>
+          </Button>
+        </div>
+      </div>
 
       {/* 4 Stat Cards */}
       <div className="my-5 grid grid-cols-2 gap-3 xl:grid-cols-4 sm:gap-4">

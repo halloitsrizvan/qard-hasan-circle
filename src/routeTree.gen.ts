@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CommitteeRouteImport } from './routes/committee'
 import { Route as ContributionsRouteImport } from './routes/contributions'
@@ -19,11 +20,17 @@ import { Route as LoansRouteImport } from './routes/loans'
 import { Route as MembersRouteImport } from './routes/members'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as WealthRouteImport } from './routes/wealth'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -71,6 +78,11 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WealthRoute = WealthRouteImport.update({
+  id: '/wealth',
+  path: '/wealth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WelcomeRoute = WelcomeRouteImport.update({
   id: '/welcome',
   path: '/welcome',
@@ -79,6 +91,7 @@ const WelcomeRoute = WelcomeRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/committee': typeof CommitteeRoute
   '/contributions': typeof ContributionsRoute
@@ -88,10 +101,12 @@ export interface FileRoutesByFullPath {
   '/members': typeof MembersRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
+  '/wealth': typeof WealthRoute
   '/welcome': typeof WelcomeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/committee': typeof CommitteeRoute
   '/contributions': typeof ContributionsRoute
@@ -101,11 +116,13 @@ export interface FileRoutesByTo {
   '/members': typeof MembersRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
+  '/wealth': typeof WealthRoute
   '/welcome': typeof WelcomeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/auth': typeof AuthRoute
   '/committee': typeof CommitteeRoute
   '/contributions': typeof ContributionsRoute
@@ -115,12 +132,14 @@ export interface FileRoutesById {
   '/members': typeof MembersRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
+  '/wealth': typeof WealthRoute
   '/welcome': typeof WelcomeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/auth'
     | '/committee'
     | '/contributions'
@@ -130,10 +149,12 @@ export interface FileRouteTypes {
     | '/members'
     | '/rules'
     | '/settings'
+    | '/wealth'
     | '/welcome'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/auth'
     | '/committee'
     | '/contributions'
@@ -143,10 +164,12 @@ export interface FileRouteTypes {
     | '/members'
     | '/rules'
     | '/settings'
+    | '/wealth'
     | '/welcome'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/auth'
     | '/committee'
     | '/contributions'
@@ -156,11 +179,13 @@ export interface FileRouteTypes {
     | '/members'
     | '/rules'
     | '/settings'
+    | '/wealth'
     | '/welcome'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   AuthRoute: typeof AuthRoute
   CommitteeRoute: typeof CommitteeRoute
   ContributionsRoute: typeof ContributionsRoute
@@ -170,6 +195,7 @@ export interface RootRouteChildren {
   MembersRoute: typeof MembersRoute
   RulesRoute: typeof RulesRoute
   SettingsRoute: typeof SettingsRoute
+  WealthRoute: typeof WealthRoute
   WelcomeRoute: typeof WelcomeRoute
 }
 
@@ -180,6 +206,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -245,6 +278,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/wealth': {
+      id: '/wealth'
+      path: '/wealth'
+      fullPath: '/wealth'
+      preLoaderRoute: typeof WealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/welcome': {
       id: '/welcome'
       path: '/welcome'
@@ -257,6 +297,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   AuthRoute: AuthRoute,
   CommitteeRoute: CommitteeRoute,
   ContributionsRoute: ContributionsRoute,
@@ -266,6 +307,7 @@ const rootRouteChildren: RootRouteChildren = {
   MembersRoute: MembersRoute,
   RulesRoute: RulesRoute,
   SettingsRoute: SettingsRoute,
+  WealthRoute: WealthRoute,
   WelcomeRoute: WelcomeRoute,
 }
 export const routeTree = rootRouteImport

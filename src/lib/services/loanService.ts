@@ -25,6 +25,7 @@ export interface LoanService {
   approveAndDisburse(loanId: string): Promise<Loan>;
   reject(loanId: string, reason: string): Promise<Loan>;
   payInstallment(installmentId: string, loanId: string): Promise<Installment>;
+  sponsorInstallment(installmentId: string, loanId: string, sponsorName?: string): Promise<Installment>;
   reschedule(loanId: string, newMonths: number, reason: string): Promise<Loan>;
   waive(loanId: string, reason: string): Promise<Loan>;
 }
@@ -56,6 +57,11 @@ export const loanService: LoanService = {
 
   async payInstallment(installmentId, loanId) {
     return payInstallmentInDB(installmentId, loanId);
+  },
+
+  async sponsorInstallment(installmentId, loanId, sponsorName) {
+    const { sponsorInstallmentInDB } = await import('./firestoreAdapter');
+    return sponsorInstallmentInDB(installmentId, loanId, sponsorName);
   },
 
   async reschedule(loanId, newMonths, reason) {

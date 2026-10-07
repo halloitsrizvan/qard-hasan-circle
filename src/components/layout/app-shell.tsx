@@ -7,6 +7,8 @@ import {
   BookOpen,
   ChevronDown,
   CircleHelp,
+  Coins,
+  Crown,
   Globe,
   HandCoins,
   HeartHandshake,
@@ -50,7 +52,22 @@ export function Brand({ compact = false }: { compact?: boolean }) {
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { circle, user, role, dark, toggleTheme, switchRole, isFirebaseUser, authModalOpen, setAuthModalOpen } = useDemo();
+  const {
+    circle,
+    user,
+    role,
+    dark,
+    toggleTheme,
+    switchRole,
+    isFirebaseUser,
+    isDemoUser,
+    isAuthenticated,
+    isLoadingAuth,
+    signInAsDemo,
+    signOut,
+    authModalOpen,
+    setAuthModalOpen
+  } = useDemo();
   const { language, setLanguage, t } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -70,16 +87,84 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
+  // If checking authentication status, show elegant loading state
+  if (isLoadingAuth) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="relative flex size-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg shadow-primary/25 animate-pulse">
+            <HeartHandshake size={28} />
+          </div>
+          <div>
+            <p className="font-display text-lg font-bold">Mahallu Qard Hasan Circle</p>
+            <p className="mt-1 text-xs text-muted-foreground animate-pulse">Verifying circle authorization...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If unauthenticated user tries to access protected page, show Auth Gate
+  if (!isAuthenticated || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-muted/30 via-background to-background p-4">
+        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xl text-center space-y-5 animate-in fade-in-0">
+          <div className="mx-auto flex size-16 items-center justify-center rounded-3xl bg-primary/10 border border-primary/20 text-primary">
+            <ShieldCheck size={32} />
+          </div>
+          <div>
+            <h2 className="font-display text-2xl font-bold">Authentication Required</h2>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              This area is restricted to verified circle members and committee administrators. Please sign in or use demo access to proceed.
+            </p>
+          </div>
+
+          <div className="space-y-2.5 pt-2">
+            <Button
+              asChild
+              className="w-full rounded-xl py-5 font-bold shadow-md shadow-primary/20"
+            >
+              <Link to="/auth">
+                <LogIn className="mr-2" size={16} />
+                Sign In or Register
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => signInAsDemo('Committee Admin')}
+              className="w-full rounded-xl py-5 border-amber-300 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-300 font-bold gap-2 hover:bg-amber-100/60 cursor-pointer"
+            >
+              <Sparkles size={16} className="text-amber-500" />
+              <span>Instant Demo Access (Admin)</span>
+            </Button>
+            <Button
+              asChild
+              variant="ghost"
+              className="w-full rounded-xl text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Link to="/">
+                ← Return to Public Homepage
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+
   const navigation = [
     { to: '/dashboard' as const, label: t.circleOverview, icon: LayoutDashboard },
+    { to: '/wealth' as const, label: t.wealthAndChit, icon: Coins },
     { to: '/contributions' as const, label: t.contributions, icon: Wallet },
     { to: '/loans' as const, label: t.loans, icon: HandCoins },
     { to: '/ledger' as const, label: t.ledger, icon: BookOpen },
     { to: '/members' as const, label: t.members, icon: Users }
   ];
 
-  const roles: Role[] = ['Committee Admin', 'Member', 'Guarantor', 'Auditor'];
+  const roles: Role[] = ['Super Admin', 'Committee Admin', 'Member', 'Guarantor', 'Auditor'];
   const roleDescriptions: Record<Role, string> = {
+    'Super Admin': 'Full authority over all users, roles & circle settings',
     'Committee Admin': 'Manage your community circle',
     Member: 'Contribute and view your loans',
     Guarantor: 'Review the requests you guarantee',
@@ -88,11 +173,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const pageTitles: Record<string, string> = {
     '/dashboard': t.circleOverview,
+    '/wealth': t.wealthAndChit,
     '/contributions': t.contributions,
     '/loans': t.loans,
     '/ledger': t.ledger,
     '/members': t.members,
     '/committee': t.committee,
+    '/admin': 'Super Admin Hub',
     '/rules': t.rules,
     '/settings': t.settings,
     '/': 'Public Page',
@@ -139,6 +226,23 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="mt-6 px-8 text-[9px] font-semibold tracking-[.14em] text-muted-foreground">COMMUNITY</div>
         <nav aria-label="Main navigation" className="mt-3 space-y-1 px-4">
+          {role === 'Super Admin' && (
+            <Button
+              asChild
+              variant="ghost"
+              className="sidebar-link relative border border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-300 font-bold hover:bg-amber-500/20 mb-2"
+              data-active={pathname === '/admin'}
+            >
+              <Link to="/admin">
+                <Crown className="mr-1 text-amber-500" size={18} />
+                <span>Super Admin</span>
+                <span className="ml-auto rounded-md bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-300">
+                  HUB
+                </span>
+              </Link>
+            </Button>
+          )}
+
           {navigation.map(({ to, label, icon: Icon }) => (
             <Button key={to} asChild variant="ghost" className="sidebar-link relative" data-active={pathname === to}>
               <Link to={to}>
@@ -147,7 +251,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             </Button>
           ))}
-          {role === 'Committee Admin' && (
+          {(role === 'Super Admin' || role === 'Committee Admin') && (
             <Button
               asChild
               variant="ghost"
@@ -373,7 +477,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Mobile Navigation */}
-      <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
         {navigation.map(({ to, label, icon: Icon }) => (
           <Button
             asChild
@@ -417,7 +521,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               className="h-auto w-full justify-start rounded-lg px-3 py-3"
             >
               <span className="flex size-8 items-center justify-center rounded-lg bg-secondary text-primary">
-                {r === 'Committee Admin' ? (
+                {r === 'Super Admin' ? (
+                  <Crown size={18} className="text-amber-500" />
+                ) : r === 'Committee Admin' ? (
                   <ShieldCheck size={18} />
                 ) : r === 'Member' ? (
                   <Users size={18} />

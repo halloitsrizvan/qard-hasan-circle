@@ -14,7 +14,8 @@ export const Route = createFileRoute('/dashboard')({
       context.queryClient.ensureQueryData(circleQueries.overview),
       context.queryClient.ensureQueryData(circleQueries.loans),
       context.queryClient.ensureQueryData(circleQueries.ledger),
-      context.queryClient.ensureQueryData(circleQueries.members)
+      context.queryClient.ensureQueryData(circleQueries.members),
+      context.queryClient.ensureQueryData(circleQueries.wealth)
     ]);
   },
   component: OverviewPage

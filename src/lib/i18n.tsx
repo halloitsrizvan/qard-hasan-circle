@@ -32,6 +32,7 @@ export interface Translations {
   member: string;
   auditor: string;
   quickDemoTour: string;
+  wealthAndChit: string;
 }
 
 const translations: Record<Language, Translations> = {
@@ -40,6 +41,7 @@ const translations: Record<Language, Translations> = {
     tagline: 'A little from each of us. A world of difference for one of us.',
     circleOverview: 'Circle Overview',
     contributions: 'Contributions',
+    wealthAndChit: 'Wealth & Chit Fund',
     loans: 'Community Loans',
     ledger: 'Transparent Ledger',
     members: 'Members',
@@ -71,6 +73,7 @@ const translations: Record<Language, Translations> = {
     tagline: 'നമ്മളിൽ ഓരോരുത്തരിലും നിന്നും ഒരു ചെറിയ വിഹിതം. ഒരു കുടുംബത്തിന് വലിയ ആശ്വാസം.',
     circleOverview: 'സർക്കിൾ അവലോകനം',
     contributions: 'വിഹിതങ്ങൾ',
+    wealthAndChit: 'സമ്പാദ്യവും ചിട്ടിയും',
     loans: 'പലിശരഹിത വായ്പകൾ',
     ledger: 'സുതാര്യമായ ലെഡ്ജർ',
     members: 'അംഗങ്ങൾ',
@@ -102,6 +105,7 @@ const translations: Record<Language, Translations> = {
     tagline: 'हम सब की थोड़ी सी मदद, किसी एक के लिए बड़ी राहत।',
     circleOverview: 'सर्कल विवरण',
     contributions: 'योगदान',
+    wealthAndChit: 'धन और चिट फंड',
     loans: 'ब्याज-मुक्त ऋण',
     ledger: 'पारदर्शी बहीखाता',
     members: 'सदस्य',

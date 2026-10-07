@@ -22,7 +22,9 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Crown,
   RotateCcw,
+  ShieldAlert,
   UserCheck,
   FileText
 } from 'lucide-react';
@@ -445,6 +447,7 @@ export function LedgerView() {
 
 export function MembersView() {
   const { data: members } = useSuspenseQuery(circleQueries.members);
+  const { role: currentRole } = useDemo();
   const queryClient = useQueryClient();
 
   const [joinModalOpen, setJoinModalOpen] = useState(false);
@@ -453,6 +456,33 @@ export function MembersView() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+
+  const isSuperAdmin = currentRole === 'Super Admin';
+
+  const handleRoleChange = async (userId: string, userName: string, newRole: Role) => {
+    setUpdatingUserId(userId);
+    try {
+      await circleService.updateUserRole(userId, newRole);
+      toast.success(`Role updated for ${userName} to ${newRole}!`);
+      await queryClient.invalidateQueries();
+    } catch (err: any) {
+      toast.error('Failed to update role: ' + (err.message || String(err)));
+    } finally {
+      setUpdatingUserId(null);
+    }
+  };
+
+  const handleToggleMembership = async (membershipId: string, currentStatus: 'Active' | 'Pending', userName: string) => {
+    const nextStatus = currentStatus === 'Active' ? 'Pending' : 'Active';
+    try {
+      await circleService.updateMembershipStatus(membershipId, nextStatus);
+      toast.success(`Membership for ${userName} is now ${nextStatus}`);
+      await queryClient.invalidateQueries();
+    } catch (err: any) {
+      toast.error('Failed to change status: ' + (err.message || String(err)));
+    }
+  };
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -478,7 +508,7 @@ export function MembersView() {
   };
 
   return (
-    <div className="page-enter">
+    <div className="page-enter space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <PageIntro title="The People Behind the Pool" description="12 members. One shared commitment to care." />
         <Button onClick={() => setJoinModalOpen(true)} className="gap-2">
@@ -487,6 +517,18 @@ export function MembersView() {
         </Button>
       </div>
 
+      {isSuperAdmin && (
+        <div className="rounded-2xl border border-gold/40 bg-gold-soft/50 p-4 text-xs shadow-sm">
+          <div className="flex items-center gap-2 font-semibold text-gold-foreground">
+            <Crown size={18} className="text-gold" />
+            <span>Super Admin Authority Active</span>
+          </div>
+          <p className="mt-1 text-muted-foreground">
+            You can reassign any user's role (Super Admin, Committee Admin, Member, Guarantor, Auditor) or toggle membership access in real time.
+          </p>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {members.map(({ user, membership }) => (
           <article key={user.id} className="rounded-2xl border bg-card p-5 shadow-soft">
@@ -494,10 +536,43 @@ export function MembersView() {
               <span className="flex size-12 items-center justify-center rounded-full bg-secondary text-sm font-medium text-primary">
                 {user.initials}
               </span>
-              <StatusChip status={membership.status} />
+              <div className="flex items-center gap-2">
+                <StatusChip status={membership.status} />
+                {isSuperAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleToggleMembership(membership.id, membership.status, user.name)}
+                    className="text-[10px] text-muted-foreground underline hover:text-foreground"
+                    title="Toggle Active/Pending status"
+                  >
+                    Toggle
+                  </button>
+                )}
+              </div>
             </div>
+
             <h2 className="mt-4 font-display text-xl">{user.name}</h2>
-            <p className="mt-1 text-xs text-muted-foreground">{user.role}</p>
+            
+            {isSuperAdmin ? (
+              <div className="mt-2 space-y-1">
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase">Assign Role</label>
+                <select
+                  value={user.role}
+                  disabled={updatingUserId === user.id}
+                  onChange={(e) => handleRoleChange(user.id, user.name, e.target.value as Role)}
+                  className="w-full rounded-lg border bg-background py-1.5 px-2 text-xs font-medium text-foreground focus:outline-primary"
+                >
+                  <option value="Super Admin">Super Admin (👑 Full Control)</option>
+                  <option value="Committee Admin">Committee Admin</option>
+                  <option value="Member">Member</option>
+                  <option value="Guarantor">Guarantor</option>
+                  <option value="Auditor">Auditor (Read-Only)</option>
+                </select>
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">{user.role}</p>
+            )}
+
             <p className="mt-5 border-t pt-3 text-[10px] text-muted-foreground">Joined {formatDate(membership.joinedAt)}</p>
           </article>
         ))}
@@ -634,12 +709,12 @@ export function CommitteeView() {
     <div className="page-enter">
       <PageIntro title="Committee Console" description="Careful decisions. Compassionate support. Riba-free enforcement." />
 
-      {role !== 'Committee Admin' ? (
+      {role !== 'Committee Admin' && role !== 'Super Admin' ? (
         <div className="py-16 text-center">
           <Lock className="mx-auto text-primary" size={28} />
           <h2 className="mt-4 font-display text-xl">Committee Access Only</h2>
           <p className="mt-2 text-xs text-muted-foreground">
-            Please switch to the <strong>Committee Admin</strong> demo role or log in with committee credentials.
+            Please switch to the <strong>Super Admin</strong> or <strong>Committee Admin</strong> demo role or log in with committee credentials.
           </p>
         </div>
       ) : (
