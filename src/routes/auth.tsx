@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createFileRoute, Link, useNavigate, useRouter } from '@tanstack/react-router';
+import { useQuery } from '@tanstack/react-query';
 import {
   HeartHandshake,
   ShieldCheck,
@@ -26,9 +27,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDemo } from '@/lib/demo-context';
+import { circleService } from '@/lib/services';
 import { circleHead } from '@/lib/route-head';
 import type { Role } from '@/lib/types';
 import { toast } from 'sonner';
+import logoImg from '@/assets/logo.png';
 
 function AuthPageComponent() {
   const {
@@ -47,6 +50,11 @@ function AuthPageComponent() {
     toggleTheme
   } = useDemo();
 
+  const { data: allCircles = [] } = useQuery({
+    queryKey: ['allCircles'],
+    queryFn: () => circleService.getAllCircles()
+  });
+
   const router = useRouter();
   const [tab, setTab] = useState<'signin' | 'signup' | 'demo' | 'reset'>('signin');
   const [loading, setLoading] = useState(false);
@@ -56,6 +64,7 @@ function AuthPageComponent() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [selectedRole, setSelectedRole] = useState<Role>('Member');
+  const [selectedCircleId, setSelectedCircleId] = useState<string>('mahallu');
   const [showPassword, setShowPassword] = useState(false);
 
   const navigateToDashboard = () => {
@@ -104,7 +113,7 @@ function AuthPageComponent() {
 
     setLoading(true);
     try {
-      const newUser = await signUpWithEmail(email, password, name, selectedRole);
+      const newUser = await signUpWithEmail(email, password, name, selectedRole, selectedCircleId);
       toast.success(`Account created! Welcome to Mahallu Circle, ${newUser.name}.`);
       navigateToDashboard();
     } catch (err: any) {
@@ -172,9 +181,9 @@ function AuthPageComponent() {
       {/* Top Navbar */}
       <header className="border-b border-border/70 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
-              <HeartHandshake size={20} strokeWidth={1.8} />
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <span className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-white p-1 shadow-md shadow-primary/10 ring-1 ring-border/60 transition-transform group-hover:scale-105">
+              <img src={logoImg} alt="Qard Hasan Logo" className="size-full object-contain" />
             </span>
             <span className="font-display text-lg font-bold">
               Qard Hasan <span className="font-sans text-[10px] tracking-widest text-muted-foreground uppercase">Circles</span>
@@ -514,6 +523,31 @@ function AuthPageComponent() {
                       <option value="Guarantor">Guarantor (Vouch for Members)</option>
                       <option value="Auditor">Auditor (Independent Reviewer)</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Building2 size={14} className="text-primary" />
+                      <span>Select Mahallu / Mosque Circle</span>
+                    </label>
+                    <select
+                      value={selectedCircleId}
+                      onChange={(e) => setSelectedCircleId(e.target.value)}
+                      className="mt-1 block w-full rounded-xl border border-input bg-background px-3 py-2.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      {allCircles && allCircles.length > 0 ? (
+                        allCircles.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} {c.location ? `(${c.location})` : ''}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="mahallu">Mahallu Qard Hasan Circle (Perinthalmanna Juma Masjid)</option>
+                      )}
+                    </select>
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      Your contributions and mutual lending will be attached to this Mahallu.
+                    </p>
                   </div>
 
                   <Button

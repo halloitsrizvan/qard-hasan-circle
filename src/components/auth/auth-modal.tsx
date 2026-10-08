@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   LogIn,
   UserPlus,
@@ -15,13 +16,16 @@ import {
   LogOut,
   KeyRound,
   CheckCircle2,
-  Crown
+  Crown,
+  Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDemo } from '@/lib/demo-context';
+import { circleService } from '@/lib/services';
 import type { Role } from '@/lib/types';
 import { toast } from 'sonner';
+import logoImg from '@/assets/logo.png';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -42,6 +46,11 @@ export function AuthModal({ isOpen, onClose, initialTab = 'signin' }: AuthModalP
     switchRole
   } = useDemo();
 
+  const { data: allCircles = [] } = useQuery({
+    queryKey: ['allCircles'],
+    queryFn: () => circleService.getAllCircles()
+  });
+
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<'signin' | 'signup' | 'reset'>(initialTab);
   const [loading, setLoading] = useState(false);
@@ -51,6 +60,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'signin' }: AuthModalP
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [selectedRole, setSelectedRole] = useState<Role>('Member');
+  const [selectedCircleId, setSelectedCircleId] = useState('mahallu');
   const [inviteCode, setInviteCode] = useState('MAHALLU-2026');
   const [showPassword, setShowPassword] = useState(false);
 
@@ -120,7 +130,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'signin' }: AuthModalP
 
     setLoading(true);
     try {
-      const newUser = await signUpWithEmail(email, password, name, selectedRole);
+      const newUser = await signUpWithEmail(email, password, name, selectedRole, selectedCircleId);
       toast.success(`Account created! Welcome to Mahallu Circle, ${newUser.name}.`);
       onClose();
     } catch (err: any) {
@@ -186,8 +196,8 @@ export function AuthModal({ isOpen, onClose, initialTab = 'signin' }: AuthModalP
         {/* Modal Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-zinc-100 bg-zinc-50/80 px-6 py-4.5">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-emerald-50 border border-emerald-200/60 text-emerald-700">
-              <ShieldCheck size={22} />
+            <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-white p-1 border border-zinc-200/80 shadow-xs">
+              <img src={logoImg} alt="Qard Hasan" className="size-full object-contain" />
             </div>
             <div>
               <h2 className="font-display text-lg font-bold text-zinc-900">
@@ -498,6 +508,28 @@ export function AuthModal({ isOpen, onClose, initialTab = 'signin' }: AuthModalP
                       className="mt-1 h-9 rounded-xl border-zinc-200 bg-zinc-50/70 text-xs font-mono font-bold uppercase text-zinc-900 focus:bg-white focus:border-emerald-600"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-zinc-700 flex items-center gap-1.5">
+                    <Building2 size={13} className="text-emerald-700" />
+                    <span>Select Mahallu / Mosque</span>
+                  </label>
+                  <select
+                    value={selectedCircleId}
+                    onChange={(e) => setSelectedCircleId(e.target.value)}
+                    className="mt-1 block w-full rounded-xl border border-zinc-200 bg-zinc-50/70 px-3 py-2 text-xs font-semibold text-zinc-900 focus:bg-white focus:border-emerald-600 focus:outline-none"
+                  >
+                    {allCircles && allCircles.length > 0 ? (
+                      allCircles.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.location ? `(${c.location})` : ''}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="mahallu">Mahallu Qard Hasan Circle (Perinthalmanna Juma Masjid)</option>
+                    )}
+                  </select>
                 </div>
 
                 <button

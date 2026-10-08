@@ -12,11 +12,14 @@ import {
   fetchCircleByIdFromDB,
   createCircleInDB,
   updateCircleInDB,
+  deleteMahallInDB,
+  purgeExtraMahallsInDB,
   fetchAllUsersWithMahalluFromDB,
   createUserAndAssignToMahalluInDB,
   reassignUserRoleAndMahalluInDB,
   deleteUserInDB,
-  fetchSuperAdminStatsFromDB
+  fetchSuperAdminStatsFromDB,
+  switchActiveCircleInDB
 } from './firestoreAdapter';
 
 export interface CircleService {
@@ -24,12 +27,23 @@ export interface CircleService {
   getMembers(): Promise<{ user: User; membership: Membership }[]>;
   getOverview(): Promise<Overview>;
   seedDB(force?: boolean): Promise<{ success: boolean; message: string }>;
-  join(data: { name: string; email: string; phone?: string; address?: string; note?: string }): Promise<{ user: User; membership: Membership }>;
+  join(data: {
+    name: string;
+    email: string;
+    password?: string;
+    phone?: string;
+    address?: string;
+    circleId?: string;
+    monthlyCommitment?: number;
+    note?: string;
+  }): Promise<{ user: User; membership: Membership }>;
   approveMembership(membershipId: string): Promise<Membership>;
   updateUserRole(userId: string, newRole: Role): Promise<User>;
   updateMembershipStatus(membershipId: string, status: 'Active' | 'Pending'): Promise<Membership>;
   getAllCircles(): Promise<Circle[]>;
   getCircleById(id: string): Promise<Circle>;
+  deleteMahall(id: string): Promise<{ success: boolean }>;
+  purgeExtraMahalls(): Promise<{ success: boolean; deletedCount: number }>;
   createMahall(data: {
     name: string;
     mosque: string;
@@ -38,8 +52,9 @@ export interface CircleService {
     minContribution?: number | undefined;
     maxLoan?: number | undefined;
     maxMonths?: number | undefined;
-    adminName?: string | undefined;
-    adminEmail?: string | undefined;
+    adminName: string;
+    adminEmail: string;
+    adminMonthlyCommitment?: number | undefined;
   }): Promise<Circle>;
   updateMahall(id: string, updates: Partial<Circle>): Promise<Circle>;
   getAllUsersWithMahallu(): Promise<{ user: User; circle?: Circle | undefined; membership?: Membership | undefined }[]>;
@@ -49,15 +64,21 @@ export interface CircleService {
     role: Role;
     circleId: string;
     phone?: string | undefined;
+    monthlyCommitment?: number | undefined;
   }): Promise<{ user: User; membership: Membership }>;
   reassignUserRoleAndMahall(userId: string, role: Role, circleId: string): Promise<{ user: User; membership: Membership }>;
   deleteUser(userId: string): Promise<{ success: boolean }>;
   getSuperAdminStats(): Promise<SuperAdminStats>;
+  switchActiveCircle(circleId: string): Promise<Circle>;
 }
 
 export const circleService: CircleService = {
   async getActive(): Promise<Circle> {
     return fetchCircleFromDB();
+  },
+
+  async switchActiveCircle(circleId: string): Promise<Circle> {
+    return switchActiveCircleInDB(circleId);
   },
 
   async getMembers(): Promise<{ user: User; membership: Membership }[]> {
@@ -102,6 +123,14 @@ export const circleService: CircleService = {
 
   async updateMahall(id: string, updates: Partial<Circle>): Promise<Circle> {
     return updateCircleInDB(id, updates);
+  },
+
+  async deleteMahall(id: string): Promise<{ success: boolean }> {
+    return deleteMahallInDB(id);
+  },
+
+  async purgeExtraMahalls(): Promise<{ success: boolean; deletedCount: number }> {
+    return purgeExtraMahallsInDB();
   },
 
   async getAllUsersWithMahallu(): Promise<{ user: User; circle?: Circle | undefined; membership?: Membership | undefined }[]> {

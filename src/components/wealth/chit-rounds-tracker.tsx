@@ -13,7 +13,7 @@ import {
   Gavel
 } from 'lucide-react';
 import type { ChitRound } from '@/lib/types';
-import { Money } from '@/components/shared';
+import { Money, RoleGate } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 
 interface ChitRoundsTrackerProps {
@@ -43,7 +43,7 @@ export function ChitRoundsTracker({ rounds, activeRoundNumber, onSelectRound }: 
           </div>
           <h2 className="mt-1 font-display text-xl font-bold">12-Month Rotating Chit Rounds</h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Non-custodial pot rotation: everyone contributes, one member claims the pot each month, auction discounts are distributed as dividends.
+            Non-custodial pot rotation: everyone contributes, one member claims the pot each month through verifiable lucky draw.
           </p>
         </div>
 
@@ -95,7 +95,7 @@ export function ChitRoundsTracker({ rounds, activeRoundNumber, onSelectRound }: 
                         : 'bg-secondary/70 text-muted-foreground'
                     }`}
                   >
-                    {round.mode === 'Auction' ? <Gavel size={11} /> : <Dice5 size={11} />}
+                    <Dice5 size={11} />
                     {round.status}
                   </span>
                 </div>
@@ -112,17 +112,7 @@ export function ChitRoundsTracker({ rounds, activeRoundNumber, onSelectRound }: 
                       <Award size={13} className="text-gold" />
                       <span>{round.winnerName}</span>
                     </div>
-                    {round.discountBid && round.discountBid > 0 ? (
-                      <div className="text-[11px] text-muted-foreground">
-                        <span>Discount: <Money amount={round.discountBid} /></span>
-                        <br />
-                        <span className="font-medium text-primary">
-                          +<Money amount={round.dividendPerMember || 0} /> dividend/member
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="text-[11px] text-muted-foreground">Lucky draw winner · Full payout</div>
-                    )}
+                    <div className="text-[11px] text-muted-foreground">Lucky draw winner · Full payout</div>
                   </div>
                 )}
 
@@ -133,7 +123,7 @@ export function ChitRoundsTracker({ rounds, activeRoundNumber, onSelectRound }: 
                       <span>Draw Pending</span>
                     </div>
                     <p className="text-[10px] leading-tight text-muted-foreground">
-                      Sealed bidding open for eligible circle members.
+                      Ready for monthly lucky draw selection.
                     </p>
                   </div>
                 )}
@@ -157,13 +147,22 @@ export function ChitRoundsTracker({ rounds, activeRoundNumber, onSelectRound }: 
                     </span>
                   </div>
                 ) : isCurrent ? (
-                  <Button
-                    size="sm"
-                    onClick={() => onSelectRound(round)}
-                    className="w-full h-8 gap-1.5 rounded-lg text-xs font-medium"
+                  <RoleGate
+                    allowed={['Committee Admin']}
+                    fallback={
+                      <div className="rounded-lg bg-gold-soft/40 py-1.5 text-center text-[10px] font-semibold text-gold-foreground">
+                        Round Active · Draw Pending
+                      </div>
+                    }
                   >
-                    Conduct Draw <ChevronRight size={12} />
-                  </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => onSelectRound(round)}
+                      className="w-full h-8 gap-1.5 rounded-lg text-xs font-medium"
+                    >
+                      Conduct Draw <ChevronRight size={12} />
+                    </Button>
+                  </RoleGate>
                 ) : (
                   <p className="text-[10px] text-muted-foreground text-center">Awaiting round turn</p>
                 )}

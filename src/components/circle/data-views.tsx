@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useSuspenseQuery, useQueryClient } from '@tanstack/react-query';
+import { createPortal } from 'react-dom';
+import { useSuspenseQuery, useQueryClient, useQuery } from '@tanstack/react-query';
 import {
   Download,
   Search,
@@ -26,15 +27,19 @@ import {
   RotateCcw,
   ShieldAlert,
   UserCheck,
-  FileText
+  FileText,
+  Eye,
+  EyeOff,
+  Building2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Money, StatusChip, formatDate, PrinciplesNote } from '@/components/shared';
+import { Money, StatusChip, formatDate, PrinciplesNote, RoleGate } from '@/components/shared';
 import { useDemo } from '@/lib/demo-context';
 import { circleQueries, loanService, contributionService, circleService } from '@/lib/services';
 import type { LedgerEntry, Role, Loan, Contribution, User, Membership } from '@/lib/types';
 import { RequestLoanModal, ContributeModal, LoanDetailModal } from './modals';
+import { MonthlyCommitmentTracker } from './monthly-commitment-tracker';
 import { toast } from 'sonner';
 
 export function PageIntro({ title, description }: { title: string; description: string }) {
@@ -56,8 +61,8 @@ export function LoansView() {
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-
-  const filtered = role === 'Guarantor' ? loans.filter((l) => l.guarantorId === user?.id) : loans;
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
 
   const handleVouch = async (loanId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,6 +73,20 @@ export function LoansView() {
       await queryClient.invalidateQueries();
     } catch (err: any) {
       toast.error(err.message || 'Failed to vouch');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleApprove = async (loanId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setActionLoading(loanId);
+    try {
+      await loanService.approveAndDisburse(loanId);
+      toast.success('Loan approved! 0% interest principal disbursed.');
+      await queryClient.invalidateQueries();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve loan');
     } finally {
       setActionLoading(null);
     }
@@ -93,97 +112,287 @@ export function LoansView() {
     }
   };
 
+  // Real-time calculations
+  const totalDisbursed = loans.reduce((sum, l) => sum + (['Active', 'Closed', 'Overdue'].includes(l.status) ? l.amount : 0), 0);
+  const totalRepaid = loans.reduce((sum, l) => sum + (l.repaid || 0), 0);
+  const activeCount = loans.filter((l) => l.status === 'Active').length;
+  const requestedCount = loans.filter((l) => ['Requested', 'Guarantor pending'].includes(l.status)).length;
+
+  const filtered = loans.filter((l) => {
+    if (role === 'Guarantor' && l.guarantorId !== user?.id && statusFilter === 'Guaranteed by me') {
+      return false;
+    }
+    if (statusFilter !== 'All') {
+      if (statusFilter === 'Active' && l.status !== 'Active') return false;
+      if (statusFilter === 'Requested' && !['Requested', 'Guarantor pending'].includes(l.status)) return false;
+      if (statusFilter === 'Closed' && l.status !== 'Closed') return false;
+      if (statusFilter === 'Overdue' && l.status !== 'Overdue') return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const borrower = members.find((m) => m.user.id === l.userId)?.user;
+      const guarantor = members.find((m) => m.user.id === l.guarantorId)?.user;
+      const matches =
+        l.id.toLowerCase().includes(q) ||
+        l.purpose.toLowerCase().includes(q) ||
+        (borrower?.name.toLowerCase().includes(q) ?? false) ||
+        (guarantor?.name.toLowerCase().includes(q) ?? false);
+      if (!matches) return false;
+    }
+    return true;
+  });
+
   return (
-    <div className="page-enter">
+    <div className="page-enter space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <PageIntro
-          title={role === 'Guarantor' ? 'Your Guarantees' : 'Community Loans'}
-          description="Principal only. Support when it matters most, returned with dignity."
-        />
-        <Button onClick={() => setRequestModalOpen(true)} className="gap-2">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-[10px] font-bold tracking-[.12em] text-primary uppercase">
+              {circle?.mosque || 'Mahallu Qard Hasan Circle'}
+            </p>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="relative flex size-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full size-1.5 bg-emerald-500" />
+              </span>
+              Live Sync
+            </span>
+          </div>
+          <h1 className="font-display text-3xl font-bold text-foreground">
+            {role === 'Guarantor' ? 'Your Guarantees & Requests' : 'Community Loans'}
+          </h1>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Principal-only Qard Hasan. Support when it matters most, returned with dignity.
+          </p>
+        </div>
+
+        <Button onClick={() => setRequestModalOpen(true)} className="gap-2 rounded-xl text-xs font-bold shadow-sm">
           <HandCoins size={16} />
-          Request an Interest-Free Loan
+          <span>Request an Interest-Free Loan</span>
         </Button>
       </div>
 
+      {/* Real-time Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-[11px] font-semibold">Active Loans</span>
+            <HandCoins size={16} className="text-primary" />
+          </div>
+          <p className="mt-2 font-display text-2xl font-bold text-foreground">{activeCount}</p>
+          <span className="text-[10px] text-muted-foreground">{requestedCount} pending review</span>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-[11px] font-semibold">Total Disbursed</span>
+            <Wallet size={16} className="text-amber-500" />
+          </div>
+          <div className="mt-2">
+            <Money amount={totalDisbursed} className="font-display text-2xl font-bold text-foreground" />
+          </div>
+          <span className="text-[10px] text-muted-foreground">0% interest Qard Hasan</span>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-[11px] font-semibold">Total Repaid</span>
+            <CheckCircle2 size={16} className="text-emerald-500" />
+          </div>
+          <div className="mt-2">
+            <Money amount={totalRepaid} className="font-display text-2xl font-bold text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <span className="text-[10px] text-muted-foreground">Recycled to fund next families</span>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-[11px] font-semibold">Treasury Liquidity</span>
+            <ShieldCheck size={16} className="text-purple-500" />
+          </div>
+          <div className="mt-2">
+            <Money amount={circle?.balance ?? 150000} className="font-display text-2xl font-bold text-foreground" />
+          </div>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Ready for disbursement</span>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-border bg-card p-3 shadow-xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {['All', 'Active', 'Requested', 'Closed', 'Overdue'].map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                statusFilter === status
+                  ? 'bg-primary text-primary-foreground font-bold shadow-xs'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search loans, members, purpose..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 rounded-xl pl-8 text-xs bg-muted/30"
+          />
+        </div>
+      </div>
+
       {role === 'Auditor' && (
-        <p className="mb-5 flex items-center gap-2 text-xs text-muted-foreground">
-          <Lock size={14} /> Read-only auditor view
-        </p>
+        <div className="flex items-center gap-2 rounded-xl bg-muted/40 border p-3 text-xs text-muted-foreground">
+          <Lock size={14} /> 
+          <span>Read-only auditor view: Inspecting cryptographic loan ledger and Shariah compliance logs.</span>
+        </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {filtered.map((l) => {
-          const own = l.userId === user?.id;
-          const borrower = members.find((m) => m.user.id === l.userId)?.user;
-          const guarantor = members.find((m) => m.user.id === l.guarantorId)?.user;
-          const isGuarantorPending = l.status === 'Guarantor pending' && role === 'Guarantor';
+      {/* Loans Grid / Empty State */}
+      {filtered.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center space-y-3">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <HandCoins size={24} />
+          </div>
+          <div>
+            <h3 className="font-display text-base font-bold text-foreground">No loans found</h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+              {searchQuery || statusFilter !== 'All'
+                ? 'No loans match your search or filter criteria.'
+                : 'There are currently no active loan requests in this circle.'}
+            </p>
+          </div>
+          <Button onClick={() => setRequestModalOpen(true)} className="rounded-xl text-xs font-bold gap-1.5">
+            <HandCoins size={14} />
+            <span>Request Qard Hasan Loan</span>
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-4.5 md:grid-cols-2">
+          {filtered.map((l) => {
+            const own = l.userId === user?.id;
+            const borrower = members.find((m) => m.user.id === l.userId)?.user;
+            const isGuarantorPending = l.status === 'Guarantor pending' && role === 'Guarantor';
+            const isRequested = l.status === 'Requested' && role === 'Committee Admin';
+            const repaidPct = l.amount > 0 ? Math.min(100, Math.round(((l.repaid || 0) / l.amount) * 100)) : 0;
 
-          return (
-            <article
-              key={l.id}
-              onClick={() => setSelectedLoan(l)}
-              className="cursor-pointer rounded-2xl border bg-card p-6 shadow-soft transition-all hover:border-primary/40 hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">{l.id}</p>
-                <StatusChip status={l.status} />
-              </div>
+            return (
+              <article
+                key={l.id}
+                onClick={() => setSelectedLoan(l)}
+                className="group cursor-pointer rounded-3xl border border-border bg-card p-6 shadow-soft transition-all hover:border-primary/50 hover:shadow-md relative overflow-hidden flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[11px] font-bold text-muted-foreground bg-muted px-2 py-0.5 rounded-lg border border-border/60">
+                      {l.id}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {l.isSelfCovered && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
+                          <Sparkles size={10} className="text-emerald-500" />
+                          Self-Covered Fast-Track
+                        </span>
+                      )}
+                      <StatusChip status={l.status} />
+                    </div>
+                  </div>
 
-              <h2 className="mt-4 font-display text-xl">
-                {role === 'Committee Admin' || own || role === 'Guarantor'
-                  ? borrower?.name || 'Community Member'
-                  : 'Community member'}
-              </h2>
+                  <h2 className="mt-3.5 font-display text-xl font-bold text-foreground group-hover:text-primary transition-colors">
+                    {role === 'Committee Admin' || own || role === 'Guarantor'
+                      ? borrower?.name || 'Community Member'
+                      : 'Community Member'}
+                  </h2>
 
-              <p className="mt-1 text-xs text-muted-foreground">
-                {role === 'Committee Admin' || own || role === 'Guarantor'
-                  ? l.purpose
-                  : 'Community support · identity kept private'}
-              </p>
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                    {role === 'Committee Admin' || own || role === 'Guarantor'
+                      ? l.purpose
+                      : 'Community support · identity kept private'}
+                  </p>
 
-              <Money amount={l.amount} className="my-5 block text-3xl font-semibold" />
+                  <div className="my-4 flex items-baseline gap-2">
+                    <Money amount={l.amount} className="text-3xl font-bold text-foreground font-mono" />
+                    <span className="text-xs text-muted-foreground font-medium">({l.months} months tenure)</span>
+                  </div>
 
-              <div className="flex justify-between border-t pt-4 text-xs">
-                <span className="text-muted-foreground">
-                  Repaid <Money amount={l.repaid} />
-                </span>
-                <span>{l.months} months · No interest</span>
-              </div>
-
-              {/* Action buttons on card */}
-              {isGuarantorPending && (
-                <div className="mt-4 border-t pt-3">
-                  <Button
-                    size="sm"
-                    onClick={(e) => handleVouch(l.id, e)}
-                    disabled={actionLoading === l.id}
-                    className="w-full gap-1.5 text-xs bg-gold-foreground text-gold-soft hover:bg-gold-foreground/90"
-                  >
-                    <UserCheck size={14} />
-                    {actionLoading === l.id ? 'Vouching...' : 'Vouch & Confirm Guarantee'}
-                  </Button>
+                  {/* Real-time Progress Bar */}
+                  <div className="space-y-1.5 border-t border-border/60 pt-3">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-muted-foreground">
+                        Repaid: <strong className="text-foreground"><Money amount={l.repaid} /></strong>
+                      </span>
+                      <span className="text-primary">{repaidPct}%</span>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden border border-border/40">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          repaidPct >= 100 ? 'bg-emerald-500' : repaidPct > 0 ? 'bg-primary' : 'bg-muted-foreground/30'
+                        }`}
+                        style={{ width: `${repaidPct}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
-              )}
 
-              {own && l.status === 'Active' && l.repaid < l.amount && (
-                <div className="mt-4 border-t pt-3">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={(e) => handlePayInstallment(l, e)}
-                    disabled={actionLoading === l.id}
-                    className="w-full gap-1.5 text-xs"
-                  >
-                    <RotateCcw size={14} />
-                    {actionLoading === l.id ? 'Processing...' : `Pay Next Monthly Installment (₹${Math.round(l.amount / l.months)})`}
-                  </Button>
+                {/* Real-time Action Buttons */}
+                <div className="mt-4 pt-3 border-t border-border/60 space-y-2">
+                  {isGuarantorPending && (
+                    <Button
+                      size="sm"
+                      onClick={(e) => handleVouch(l.id, e)}
+                      disabled={actionLoading === l.id}
+                      className="w-full gap-1.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-xs"
+                    >
+                      <UserCheck size={14} />
+                      {actionLoading === l.id ? 'Vouching...' : 'Vouch & Confirm Guarantee (Kafala)'}
+                    </Button>
+                  )}
+
+                  {isRequested && (
+                    <Button
+                      size="sm"
+                      onClick={(e) => handleApprove(l.id, e)}
+                      disabled={actionLoading === l.id}
+                      className="w-full gap-1.5 text-xs font-bold bg-primary text-primary-foreground rounded-xl shadow-xs"
+                    >
+                      <CheckCircle2 size={14} />
+                      {actionLoading === l.id ? 'Approving...' : 'Approve & Disburse 0% Qard'}
+                    </Button>
+                  )}
+
+                  {own && l.status === 'Active' && l.repaid < l.amount && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => handlePayInstallment(l, e)}
+                      disabled={actionLoading === l.id}
+                      className="w-full gap-1.5 text-xs font-bold rounded-xl"
+                    >
+                      <RotateCcw size={14} />
+                      {actionLoading === l.id
+                        ? 'Processing...'
+                        : `Pay Next Monthly Installment (₹${Math.round(l.amount / l.months).toLocaleString('en-IN')})`}
+                    </Button>
+                  )}
+
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                    <span>Click card to inspect ledger schedule</span>
+                    <span className="font-semibold text-primary group-hover:underline">View details →</span>
+                  </div>
                 </div>
-              )}
-            </article>
-          );
-        })}
-      </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mt-6">
         <PrinciplesNote />
@@ -194,6 +403,7 @@ export function LoansView() {
         onClose={() => setRequestModalOpen(false)}
         members={members}
         maxLoan={circle?.maxLoan ?? 50000}
+        availableBalance={Math.round((circle?.balance || 10000) * 0.7)}
       />
 
       <LoanDetailModal
@@ -209,11 +419,13 @@ export function LoansView() {
 export function ContributionsView() {
   const { data: entries } = useSuspenseQuery(circleQueries.contributions);
   const { data: members } = useSuspenseQuery(circleQueries.members);
-  const { role, user } = useDemo();
+  const { role, user, circle } = useDemo();
   const queryClient = useQueryClient();
 
   const [contributeModalOpen, setContributeModalOpen] = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('All');
 
   const handleConfirm = async (id: string) => {
     setConfirming(id);
@@ -228,80 +440,226 @@ export function ContributionsView() {
     }
   };
 
-  const totalPaid = entries.filter((e) => e.status === 'Paid').reduce((s, e) => s+e.amount, 0);
+  const totalPaid = entries.filter((e) => e.status === 'Paid').reduce((s, e) => s + e.amount, 0);
+  const totalPending = entries.filter((e) => e.status === 'Pending').reduce((s, e) => s + e.amount, 0);
+  const paidCount = entries.filter((e) => e.status === 'Paid').length;
+  const pendingCount = entries.filter((e) => e.status === 'Pending').length;
+
+  const filtered = entries.filter((e) => {
+    if (statusFilter !== 'All' && e.status !== statusFilter) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const member = members.find((m) => m.user.id === e.userId)?.user;
+      const matches =
+        e.id.toLowerCase().includes(q) ||
+        e.type.toLowerCase().includes(q) ||
+        (member?.name.toLowerCase().includes(q) ?? false);
+      if (!matches) return false;
+    }
+    return true;
+  });
 
   return (
-    <div className="page-enter">
+    <div className="page-enter space-y-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <PageIntro
-          title="A little from each of us"
-          description="Our contributions keep the circle ready for the next family in need."
-        />
-        <Button onClick={() => setContributeModalOpen(true)} className="gap-2">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-[10px] font-bold tracking-[.12em] text-primary uppercase">
+              {circle?.mosque || 'Mahallu Qard Hasan Circle'}
+            </p>
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+              <span className="relative flex size-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full size-1.5 bg-emerald-500" />
+              </span>
+              Live Sync
+            </span>
+          </div>
+          <h1 className="font-display text-3xl font-bold text-foreground">A Little From Each of Us</h1>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Our monthly contributions sustain the community pool for families in emergency need.
+          </p>
+        </div>
+
+        <Button onClick={() => setContributeModalOpen(true)} className="gap-2 rounded-xl text-xs font-bold shadow-sm">
           <Wallet size={16} />
-          Make a Contribution
+          <span>Make a Contribution</span>
         </Button>
       </div>
 
-      <div className="mb-6 rounded-2xl border bg-card p-6 shadow-soft">
-        <div className="flex items-center gap-3 text-primary">
-          <Wallet size={22} />
-          <span className="text-xs font-medium">Total confirmed contributions</span>
+      {/* Real-Time Metrics Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-[11px] font-semibold">Confirmed Pool</span>
+            <Wallet size={16} className="text-primary" />
+          </div>
+          <div className="mt-2">
+            <Money amount={totalPaid} className="font-display text-2xl font-bold text-foreground" />
+          </div>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+            {paidCount} contributions reconciled
+          </span>
         </div>
-        <Money amount={totalPaid} className="mt-3 block text-4xl font-semibold" />
-        <p className="mt-2 text-xs text-muted-foreground">{entries.length} contributions recorded from our community</p>
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-[11px] font-semibold">Pending Verification</span>
+            <Clock size={16} className="text-amber-500" />
+          </div>
+          <div className="mt-2">
+            <Money amount={totalPending} className="font-display text-2xl font-bold text-amber-600 dark:text-amber-400" />
+          </div>
+          <span className="text-[10px] text-muted-foreground">{pendingCount} awaiting committee audit</span>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-[11px] font-semibold">Active Members</span>
+            <Users size={16} className="text-blue-500" />
+          </div>
+          <p className="mt-2 font-display text-2xl font-bold text-foreground">{members.length}</p>
+          <span className="text-[10px] text-muted-foreground">Regular contributors</span>
+        </div>
+
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex items-center justify-between text-muted-foreground">
+            <span className="text-[11px] font-semibold">Zero-Riba Status</span>
+            <ShieldCheck size={16} className="text-emerald-600" />
+          </div>
+          <p className="mt-2 font-display text-2xl font-bold text-emerald-600 dark:text-emerald-400">100%</p>
+          <span className="text-[10px] text-muted-foreground">Shariah Verified</span>
+        </div>
       </div>
 
-      <div className="overflow-auto rounded-2xl border bg-card p-5 shadow-soft">
-        <table className="w-full min-w-[500px] text-left text-xs">
-          <thead>
-            <tr className="border-b text-muted-foreground">
-              <th className="pb-4 font-medium">Member</th>
-              <th className="pb-4 font-medium">Date</th>
-              <th className="pb-4 font-medium">Type</th>
-              <th className="pb-4 font-medium">Amount</th>
-              <th className="pb-4 font-medium">Status</th>
-              {role === 'Committee Admin' && <th className="pb-4 text-right font-medium">Action</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {[...entries].reverse().map((e) => (
-              <tr key={e.id} className="border-b last:border-0">
-                <td className="py-4">
-                  {role === 'Committee Admin' || e.userId === user?.id
-                    ? members.find((m) => m.user.id === e.userId)?.user.name
-                    : 'Circle member'}
-                </td>
-                <td>{formatDate(e.date)}</td>
-                <td>{e.type}</td>
-                <td>
-                  <Money amount={e.amount} />
-                </td>
-                <td>
-                  <StatusChip status={e.status} />
-                </td>
-                {role === 'Committee Admin' && (
-                  <td className="text-right">
-                    {e.status === 'Pending' ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleConfirm(e.id)}
-                        disabled={confirming === e.id}
-                        className="h-7 text-xs"
-                      >
-                        {confirming === e.id ? 'Confirming...' : 'Confirm'}
-                      </Button>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">Reconciled</span>
-                    )}
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-border bg-card p-3 shadow-xs">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {['All', 'Paid', 'Pending'].map((status) => (
+            <button
+              key={status}
+              type="button"
+              onClick={() => setStatusFilter(status)}
+              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                statusFilter === status
+                  ? 'bg-primary text-primary-foreground font-bold shadow-xs'
+                  : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-64">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Search member, type, ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 rounded-xl pl-8 text-xs bg-muted/30"
+          />
+        </div>
       </div>
+
+      {/* Contributions Table or Empty State */}
+      {filtered.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-border bg-card p-12 text-center space-y-3">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <Wallet size={24} />
+          </div>
+          <div>
+            <h3 className="font-display text-base font-bold text-foreground">No contributions recorded yet</h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+              {searchQuery || statusFilter !== 'All'
+                ? 'No contributions match your search or filter criteria.'
+                : 'Start contributing to build and strengthen the zero-interest lending pool.'}
+            </p>
+          </div>
+          <Button onClick={() => setContributeModalOpen(true)} className="rounded-xl text-xs font-bold gap-1.5 shadow-sm">
+            <Wallet size={14} />
+            <span>Make First Contribution</span>
+          </Button>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-soft">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-border bg-muted/50 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-3.5">Member</th>
+                  <th className="px-5 py-3.5">Date</th>
+                  <th className="px-5 py-3.5">Contribution Type</th>
+                  <th className="px-5 py-3.5">Amount</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  {role === 'Committee Admin' && <th className="px-5 py-3.5 text-right">Committee Action</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {[...filtered].reverse().map((e) => {
+                  const member = members.find((m) => m.user.id === e.userId)?.user;
+                  return (
+                    <tr key={e.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-[10px] font-bold text-primary">
+                            {member?.initials || 'M'}
+                          </div>
+                          <div>
+                            <p className="font-bold text-foreground">
+                              {role === 'Committee Admin' || e.userId === user?.id
+                                ? member?.name || 'Circle Member'
+                                : 'Circle Member'}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground font-mono">{e.id}</p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-5 py-3.5 text-muted-foreground">{formatDate(e.date)}</td>
+
+                      <td className="px-5 py-3.5">
+                        <span className="font-semibold text-foreground">{e.type}</span>
+                      </td>
+
+                      <td className="px-5 py-3.5 font-bold font-mono text-[13px] text-foreground">
+                        <Money amount={e.amount} />
+                      </td>
+
+                      <td className="px-5 py-3.5">
+                        <StatusChip status={e.status} />
+                      </td>
+
+                      {role === 'Committee Admin' && (
+                        <td className="px-5 py-3.5 text-right">
+                          {e.status === 'Pending' ? (
+                            <Button
+                              size="sm"
+                              onClick={() => handleConfirm(e.id)}
+                              disabled={confirming === e.id}
+                              className="h-7 rounded-xl text-xs font-bold gap-1 bg-primary text-primary-foreground shadow-xs"
+                            >
+                              <CheckCircle2 size={12} />
+                              {confirming === e.id ? 'Reconciling...' : 'Confirm & Reconcile'}
+                            </Button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 size={13} />
+                              <span>Reconciled</span>
+                            </span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <ContributeModal isOpen={contributeModalOpen} onClose={() => setContributeModalOpen(false)} />
     </div>
@@ -434,7 +792,15 @@ export function LedgerView() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <p className="py-12 text-center text-sm text-muted-foreground">No entries match this search.</p>
+          <div className="py-12 text-center space-y-2">
+            <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+              <FileText size={20} />
+            </div>
+            <p className="text-xs font-bold text-foreground">No ledger transactions recorded yet</p>
+            <p className="text-[11px] text-muted-foreground max-w-sm mx-auto">
+              Approved loans, repayments, disbursements, and contributions will be cryptographically chained here with SHA-256 hashes in real-time.
+            </p>
+          </div>
         )}
       </div>
 
@@ -447,14 +813,23 @@ export function LedgerView() {
 
 export function MembersView() {
   const { data: members } = useSuspenseQuery(circleQueries.members);
-  const { role: currentRole } = useDemo();
+  const { role: currentRole, circle } = useDemo();
   const queryClient = useQueryClient();
+
+  const { data: allCircles = [] } = useQuery({
+    queryKey: ['allCircles'],
+    queryFn: () => circleService.getAllCircles()
+  });
 
   const [joinModalOpen, setJoinModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [monthlyCommitment, setMonthlyCommitment] = useState('1000');
+  const [selectedCircleId, setSelectedCircleId] = useState(circle?.id || 'mahallu');
   const [submitting, setSubmitting] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
 
@@ -486,20 +861,37 @@ export function MembersView() {
 
   const handleJoin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !email) return;
+    if (!name.trim() || !email.trim()) {
+      toast.error('Please enter name and email.');
+      return;
+    }
+    if (password && password.length < 6) {
+      toast.error('Password must be at least 6 characters.');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      await circleService.join({ name, email, phone, address });
-      toast.success('Join request submitted!', {
-        description: 'Committee will review and verify your membership.'
+      await circleService.join({
+        name: name.trim(),
+        email: email.trim(),
+        password: password.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
+        circleId: selectedCircleId || circle?.id || 'mahallu',
+        monthlyCommitment: Number(monthlyCommitment) || 1000
+      });
+      toast.success('Joined Mahallu Circle successfully!', {
+        description: 'New member account created with your credentials.'
       });
       await queryClient.invalidateQueries();
       setJoinModalOpen(false);
       setName('');
       setEmail('');
+      setPassword('');
       setPhone('');
       setAddress('');
+      setMonthlyCommitment('1000');
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit join request');
     } finally {
@@ -511,10 +903,12 @@ export function MembersView() {
     <div className="page-enter space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <PageIntro title="The People Behind the Pool" description="12 members. One shared commitment to care." />
-        <Button onClick={() => setJoinModalOpen(true)} className="gap-2">
-          <UserPlus size={16} />
-          Join / Invite Member
-        </Button>
+        <RoleGate allowed={['Committee Admin']}>
+          <Button onClick={() => setJoinModalOpen(true)} className="gap-2">
+            <UserPlus size={16} />
+            Join / Invite Member
+          </Button>
+        </RoleGate>
       </div>
 
       {isSuperAdmin && (
@@ -553,6 +947,14 @@ export function MembersView() {
 
             <h2 className="mt-4 font-display text-xl">{user.name}</h2>
             
+            <div className="mt-1.5 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Monthly Commitment:</span>
+              <span className="font-mono font-bold text-foreground">
+                <Money amount={user.monthlyCommitment ?? membership.monthlyCommitment ?? 1000} />
+                <span className="text-[10px] text-muted-foreground font-normal">/mo</span>
+              </span>
+            </div>
+
             {isSuperAdmin ? (
               <div className="mt-2 space-y-1">
                 <label className="text-[10px] font-semibold text-muted-foreground uppercase">Assign Role</label>
@@ -573,84 +975,149 @@ export function MembersView() {
               <p className="mt-1 text-xs text-muted-foreground">{user.role}</p>
             )}
 
-            <p className="mt-5 border-t pt-3 text-[10px] text-muted-foreground">Joined {formatDate(membership.joinedAt)}</p>
+            <p className="mt-4 border-t pt-3 text-[10px] text-muted-foreground">Joined {formatDate(membership.joinedAt)}</p>
           </article>
         ))}
       </div>
 
-      {joinModalOpen && (
-        <div
-          onClick={(e) => e.target === e.currentTarget && setJoinModalOpen(false)}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-xs animate-in fade-in-0"
-        >
-          <div className="relative max-h-[85vh] w-full max-w-md overflow-y-auto rounded-3xl border bg-card p-6 shadow-2xl animate-in zoom-in-95">
-            <div className="flex items-center justify-between border-b pb-4">
-              <div className="flex items-center gap-2 text-primary">
-                <UserPlus size={20} />
-                <h2 className="font-display text-xl">Join Mahallu Circle</h2>
+      {joinModalOpen && typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            onClick={(e) => e.target === e.currentTarget && setJoinModalOpen(false)}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm animate-in fade-in-0"
+          >
+            <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl border border-border bg-card p-6 shadow-2xl animate-in zoom-in-95">
+              <div className="flex items-center justify-between border-b pb-4">
+                <div className="flex items-center gap-2.5 text-primary">
+                  <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <UserPlus size={20} />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-lg font-bold text-foreground">Join Mahallu Circle</h2>
+                    <p className="text-[11px] text-muted-foreground">Submit your community verification request</p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setJoinModalOpen(false)} aria-label="Close modal">
+                  <XCircle size={18} />
+                </Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => setJoinModalOpen(false)} aria-label="Close modal">
-                <XCircle size={18} />
-              </Button>
+
+              <form onSubmit={handleJoin} className="mt-5 space-y-4">
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Circle Invite Code</label>
+                  <Input value="MAHALLU-2026" readOnly className="mt-1 bg-secondary text-xs font-mono font-semibold" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Full Name *</label>
+                  <Input
+                    required
+                    placeholder="e.g. Zaid Bin Haris"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Email Address *</label>
+                  <Input
+                    required
+                    type="email"
+                    placeholder="zaid@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Password (min 6 characters) *</label>
+                  <div className="relative mt-1">
+                    <Input
+                      required
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pr-10 text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-foreground">Monthly Commitment (₹)</label>
+                    <Input
+                      type="number"
+                      min={100}
+                      step={100}
+                      value={monthlyCommitment}
+                      onChange={(e) => setMonthlyCommitment(e.target.value)}
+                      className="mt-1 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-foreground flex items-center gap-1">
+                      <Building2 size={13} className="text-primary" />
+                      <span>Mahallu Circle</span>
+                    </label>
+                    <select
+                      value={selectedCircleId}
+                      onChange={(e) => setSelectedCircleId(e.target.value)}
+                      className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-primary"
+                    >
+                      {allCircles && allCircles.length > 0 ? (
+                        allCircles.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value={circle?.id || 'mahallu'}>{circle?.name || 'Mahallu Qard Hasan Circle'}</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Phone (Optional)</label>
+                  <Input
+                    placeholder="+91 98765 43210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Mahallu / Residence</label>
+                  <Input
+                    placeholder="e.g. Near Perinthalmanna Juma Masjid"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="mt-1 text-xs"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-3 border-t">
+                  <Button type="button" variant="outline" onClick={() => setJoinModalOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={submitting}>
+                    {submitting ? 'Submitting...' : 'Join Mahallu Circle'}
+                  </Button>
+                </div>
+              </form>
             </div>
-
-            <form onSubmit={handleJoin} className="mt-5 space-y-4">
-              <div>
-                <label className="text-xs font-medium">Circle Invite Code</label>
-                <Input value="MAHALLU-2026" readOnly className="mt-1 bg-secondary text-xs font-mono font-semibold" />
-              </div>
-              <div>
-                <label className="text-xs font-medium">Full Name</label>
-                <Input
-                  required
-                  placeholder="e.g. Zaid Bin Haris"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="mt-1 text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium">Email Address</label>
-                <Input
-                  required
-                  type="email"
-                  placeholder="zaid@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium">Phone (Optional)</label>
-                <Input
-                  placeholder="+91 98765 43210"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="mt-1 text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium">Mahallu / Residence</label>
-                <Input
-                  placeholder="e.g. Near Perinthalmanna Juma Masjid"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="mt-1 text-xs"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3 border-t">
-                <Button type="button" variant="outline" onClick={() => setJoinModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? 'Submitting...' : 'Submit Join Request'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
@@ -661,6 +1128,7 @@ export function CommitteeView() {
   const { data: members } = useSuspenseQuery(circleQueries.members);
   const queryClient = useQueryClient();
 
+  const [activeTab, setActiveTab] = useState<'tracker' | 'loans'>('tracker');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
   const handleApproveAndDisburse = async (loanId: string) => {
@@ -718,107 +1186,156 @@ export function CommitteeView() {
           </p>
         </div>
       ) : (
-        <div className="space-y-8">
-          {/* Pending Loan Requests */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display text-lg">Loan Requests Awaiting Decision ({pendingLoans.length})</h2>
-            </div>
+        <div className="space-y-6">
+          {/* Navigation Tabs */}
+          <div className="flex flex-wrap items-center gap-2 border-b pb-4">
+            <button
+              onClick={() => setActiveTab('tracker')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                activeTab === 'tracker'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-secondary/40 text-muted-foreground hover:bg-secondary/70 hover:text-foreground'
+              }`}
+            >
+              <Users size={16} />
+              <span>Monthly Commitment Tracker</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('loans')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                activeTab === 'loans'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-secondary/40 text-muted-foreground hover:bg-secondary/70 hover:text-foreground'
+              }`}
+            >
+              <HeartHandshake size={16} />
+              <span>Loan Requests & Hardship</span>
+              {pendingLoans.length > 0 && (
+                <span className={`inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                  activeTab === 'loans' ? 'bg-primary-foreground text-primary' : 'bg-amber-500 text-white'
+                }`}>
+                  {pendingLoans.length}
+                </span>
+              )}
+            </button>
+          </div>
 
-            {pendingLoans.length === 0 ? (
-              <div className="rounded-2xl border bg-card p-8 text-center text-xs text-muted-foreground">
-                No loan requests currently awaiting review.
-              </div>
-            ) : (
-              <div className="grid gap-4 md:grid-cols-2">
-                {pendingLoans.map((l) => {
-                  const borrower = members.find((m) => m.user.id === l.userId)?.user;
-                  const guarantor = members.find((m) => m.user.id === l.guarantorId)?.user;
+          {activeTab === 'tracker' ? (
+            <MonthlyCommitmentTracker currentYear={2026} />
+          ) : (
+            <div className="space-y-8">
+              {/* Pending Loan Requests */}
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-display text-lg">Loan Requests Awaiting Decision ({pendingLoans.length})</h2>
+                </div>
 
-                  return (
-                    <article key={l.id} className="rounded-2xl border bg-card p-6 shadow-soft">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-muted-foreground">{l.id}</span>
-                        <StatusChip status={l.status} />
-                      </div>
-
-                      <h3 className="mt-3 font-display text-xl">{borrower?.name}</h3>
-                      <p className="mt-1 text-xs text-muted-foreground">{l.purpose}</p>
-
-                      <div className="my-4 rounded-xl border bg-secondary/30 p-3 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Guarantor:</span>
-                          <span className="font-medium">{guarantor?.name || 'Assigned Member'}</span>
-                        </div>
-                        <div className="mt-1 flex justify-between">
-                          <span className="text-muted-foreground">Repayment:</span>
-                          <span className="font-medium">{l.months} monthly installments</span>
-                        </div>
-                      </div>
-
-                      <Money amount={l.amount} className="block text-3xl font-semibold" />
-
-                      <div className="mt-5 flex gap-2 border-t pt-4">
-                        <Button
-                          onClick={() => handleApproveAndDisburse(l.id)}
-                          disabled={processingId === l.id}
-                          className="flex-1 gap-1.5 text-xs"
-                        >
-                          <CheckCircle2 size={14} />
-                          {processingId === l.id ? 'Disbursing...' : 'Approve & Disburse'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => handleReject(l.id)}
-                          disabled={processingId === l.id}
-                          className="text-xs text-rose-600 hover:text-rose-700"
-                        >
-                          <XCircle size={14} /> Decline
-                        </Button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Hardship & Active Loans Oversight */}
-          <section className="rounded-2xl border bg-card p-6 shadow-soft">
-            <h2 className="font-display text-lg">Active Loans & Compassionate Hardship Relief</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              In accordance with Shariah principles, difficult circumstances are met with flexibility, rescheduling, or
-              charity waivers without late penalties.
-            </p>
-
-            <div className="mt-4 divide-y">
-              {activeLoans.map((l) => {
-                const borrower = members.find((m) => m.user.id === l.userId)?.user;
-                return (
-                  <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
-                    <div>
-                      <p className="text-xs font-semibold">{borrower?.name} ({l.id})</p>
-                      <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        {l.purpose} · <Money amount={l.repaid} /> of <Money amount={l.amount} /> repaid
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusChip status={l.status} />
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleHardshipWaive(l.id)}
-                        disabled={processingId === l.id}
-                        className="h-7 text-[11px] text-primary hover:bg-primary/10"
-                      >
-                        Waive as Sadaqah
-                      </Button>
-                    </div>
+                {pendingLoans.length === 0 ? (
+                  <div className="rounded-2xl border bg-card p-8 text-center text-xs text-muted-foreground">
+                    No loan requests currently awaiting review.
                   </div>
-                );
-              })}
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {pendingLoans.map((l) => {
+                      const borrower = members.find((m) => m.user.id === l.userId)?.user;
+                      const guarantor = members.find((m) => m.user.id === l.guarantorId)?.user;
+
+                      return (
+                        <article key={l.id} className="rounded-2xl border bg-card p-6 shadow-soft space-y-4">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-muted-foreground font-mono font-semibold">{l.id}</span>
+                            <div className="flex items-center gap-1.5">
+                              {l.isSelfCovered && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
+                                  <Sparkles size={10} className="text-emerald-500" />
+                                  Self-Covered Fast-Track
+                                </span>
+                              )}
+                              <StatusChip status={l.status} />
+                            </div>
+                          </div>
+
+                          <div>
+                            <h3 className="font-display text-xl font-bold">{borrower?.name}</h3>
+                            <p className="mt-1 text-xs text-muted-foreground">{l.purpose}</p>
+                          </div>
+
+                          <div className="rounded-xl border bg-secondary/30 p-3 text-xs space-y-1">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Guarantor:</span>
+                              <span className="font-medium">{l.isSelfCovered ? '✨ Self-Backed (Emergency Stake)' : (guarantor?.name || 'Assigned Member')}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Repayment:</span>
+                              <span className="font-medium">{l.months} monthly installments</span>
+                            </div>
+                          </div>
+
+                          <Money amount={l.amount} className="block text-3xl font-semibold font-mono" />
+
+                          <div className="flex gap-2 border-t pt-4">
+                            <Button
+                              onClick={() => handleApproveAndDisburse(l.id)}
+                              disabled={processingId === l.id}
+                              className="flex-1 gap-1.5 text-xs font-bold bg-primary text-primary-foreground"
+                            >
+                              <CheckCircle2 size={14} />
+                              {processingId === l.id ? 'Disbursing...' : l.isSelfCovered ? '⚡ Fast-Track Disburse' : 'Approve & Disburse'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleReject(l.id)}
+                              disabled={processingId === l.id}
+                              className="text-xs text-rose-600 hover:text-rose-700 font-semibold"
+                            >
+                              <XCircle size={14} /> Decline
+                            </Button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              {/* Hardship & Active Loans Oversight */}
+              <section className="rounded-2xl border bg-card p-6 shadow-soft">
+                <h2 className="font-display text-lg">Active Loans & Compassionate Hardship Relief</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  In accordance with Shariah principles, difficult circumstances are met with flexibility, rescheduling, or
+                  charity waivers without late penalties.
+                </p>
+
+                <div className="mt-4 divide-y">
+                  {activeLoans.map((l) => {
+                    const borrower = members.find((m) => m.user.id === l.userId)?.user;
+                    return (
+                      <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0">
+                        <div>
+                          <p className="text-xs font-semibold">{borrower?.name} ({l.id})</p>
+                          <p className="mt-0.5 text-[10px] text-muted-foreground">
+                            {l.purpose} · <Money amount={l.repaid} /> of <Money amount={l.amount} /> repaid
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <StatusChip status={l.status} />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleHardshipWaive(l.id)}
+                            disabled={processingId === l.id}
+                            className="h-7 text-[11px] text-primary hover:bg-primary/10"
+                          >
+                            Waive as Sadaqah
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
-          </section>
+          )}
         </div>
       )}
     </div>

@@ -18,6 +18,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as LedgerRouteImport } from './routes/ledger'
 import { Route as LoansRouteImport } from './routes/loans'
 import { Route as MembersRouteImport } from './routes/members'
+import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WealthRouteImport } from './routes/wealth'
@@ -68,6 +69,11 @@ const MembersRoute = MembersRouteImport.update({
   path: '/members',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RulesRoute = RulesRouteImport.update({
   id: '/rules',
   path: '/rules',
@@ -99,6 +105,7 @@ export interface FileRoutesByFullPath {
   '/ledger': typeof LedgerRoute
   '/loans': typeof LoansRoute
   '/members': typeof MembersRoute
+  '/profile': typeof ProfileRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
   '/wealth': typeof WealthRoute
@@ -114,6 +121,7 @@ export interface FileRoutesByTo {
   '/ledger': typeof LedgerRoute
   '/loans': typeof LoansRoute
   '/members': typeof MembersRoute
+  '/profile': typeof ProfileRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
   '/wealth': typeof WealthRoute
@@ -130,6 +138,7 @@ export interface FileRoutesById {
   '/ledger': typeof LedgerRoute
   '/loans': typeof LoansRoute
   '/members': typeof MembersRoute
+  '/profile': typeof ProfileRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
   '/wealth': typeof WealthRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/ledger'
     | '/loans'
     | '/members'
+    | '/profile'
     | '/rules'
     | '/settings'
     | '/wealth'
@@ -162,6 +172,7 @@ export interface FileRouteTypes {
     | '/ledger'
     | '/loans'
     | '/members'
+    | '/profile'
     | '/rules'
     | '/settings'
     | '/wealth'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/ledger'
     | '/loans'
     | '/members'
+    | '/profile'
     | '/rules'
     | '/settings'
     | '/wealth'
@@ -193,6 +205,7 @@ export interface RootRouteChildren {
   LedgerRoute: typeof LedgerRoute
   LoansRoute: typeof LoansRoute
   MembersRoute: typeof MembersRoute
+  ProfileRoute: typeof ProfileRoute
   RulesRoute: typeof RulesRoute
   SettingsRoute: typeof SettingsRoute
   WealthRoute: typeof WealthRoute
@@ -264,6 +277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MembersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rules': {
       id: '/rules'
       path: '/rules'
@@ -305,6 +325,7 @@ const rootRouteChildren: RootRouteChildren = {
   LedgerRoute: LedgerRoute,
   LoansRoute: LoansRoute,
   MembersRoute: MembersRoute,
+  ProfileRoute: ProfileRoute,
   RulesRoute: RulesRoute,
   SettingsRoute: SettingsRoute,
   WealthRoute: WealthRoute,

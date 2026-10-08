@@ -12,7 +12,7 @@ import {
 } from './firestoreAdapter';
 
 export interface LoanService {
-  list(): Promise<Loan[]>;
+  list(circleId?: string): Promise<Loan[]>;
   getInstallments(id: string): Promise<Installment[]>;
   request(params: {
     userId: string;
@@ -20,6 +20,7 @@ export interface LoanService {
     purpose: string;
     months: number;
     guarantorId: string;
+    circleId?: string | undefined;
   }): Promise<Loan>;
   guarantee(loanId: string, guarantorId: string): Promise<Loan>;
   approveAndDisburse(loanId: string): Promise<Loan>;
@@ -31,8 +32,8 @@ export interface LoanService {
 }
 
 export const loanService: LoanService = {
-  async list(): Promise<Loan[]> {
-    return fetchLoansFromDB();
+  async list(circleId?: string): Promise<Loan[]> {
+    return fetchLoansFromDB(circleId);
   },
 
   async getInstallments(id: string): Promise<Installment[]> {

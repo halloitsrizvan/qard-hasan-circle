@@ -43,12 +43,16 @@
  h1,h2,h3,p{letter-spacing:0}
  ::selection{background:var(--secondary);color:var(--primary)}
 }
-.page-enter{animation:page-in .45s ease-out both}
-@keyframes page-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.page-enter{animation:page-in .4s ease-out}
+@keyframes page-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .hero-pattern{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.45;mix-blend-mode:screen;pointer-events:none}
 .sidebar-link{width:100%;justify-content:flex-start;height:43px;padding:0 14px;border-radius:8px;font-size:13px;font-weight:400;color:var(--muted-foreground)}
 .sidebar-link[data-active=true]{background:var(--secondary);color:var(--primary);font-weight:600}
 .sidebar-link[data-active=true]::before{content:'';width:3px;height:19px;background:var(--primary);position:absolute;left:-16px;border-radius:2px}
 .chart-tooltip{border:1px solid var(--border);border-radius:8px;background:var(--card);padding:10px;font-size:12px;box-shadow:var(--shadow-soft)}
+aside::-webkit-scrollbar{width:4px}
+aside::-webkit-scrollbar-track{background:transparent}
+aside::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+aside::-webkit-scrollbar-thumb:hover{background:var(--muted-foreground)}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 @media print{aside,header,nav,.demo-switcher{display:none!important}main{margin:0!important}.print-hide{display:none!important}}

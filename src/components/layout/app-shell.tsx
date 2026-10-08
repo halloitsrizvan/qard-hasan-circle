@@ -25,21 +25,26 @@ import {
   X,
   Check,
   ChevronsUpDown,
-  LogIn
+  LogIn,
+  User
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useQuery } from '@tanstack/react-query';
+import { circleQueries } from '@/lib/services';
 import { useDemo } from '@/lib/demo-context';
 import { useI18n, type Language } from '@/lib/i18n';
 import { DemoTourModal } from '@/components/circle/modals';
 import { AuthModal } from '@/components/auth/auth-modal';
-import type { Role } from '@/lib/types';
+import type { Role, Circle } from '@/lib/types';
+import { toast } from 'sonner';
+import logoImg from '@/assets/logo.png';
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <Link to="/dashboard" className="flex items-center gap-2.5">
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-        <HeartHandshake size={23} strokeWidth={1.6} />
+    <Link to="/dashboard" className="group flex items-center gap-2.5">
+      <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1 shadow-sm ring-1 ring-border/50 transition-transform group-hover:scale-105">
+        <img src={logoImg} alt="Qard Hasan Logo" className="size-full object-contain" />
       </span>
       <span className="font-display text-xl leading-5">
         Qard Hasan
@@ -59,6 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     dark,
     toggleTheme,
     switchRole,
+    switchCircle,
     isFirebaseUser,
     isDemoUser,
     isAuthenticated,
@@ -68,6 +74,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     authModalOpen,
     setAuthModalOpen
   } = useDemo();
+  const { data: allCircles = [] } = useQuery({
+    ...circleQueries.allCircles,
+    enabled: role === 'Super Admin'
+  });
+  const [circleSwitchOpen, setCircleSwitchOpen] = useState(false);
   const { language, setLanguage, t } = useI18n();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -155,6 +166,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const navigation = [
     { to: '/dashboard' as const, label: t.circleOverview, icon: LayoutDashboard },
+    { to: '/profile' as const, label: t.profile, icon: User },
     { to: '/wealth' as const, label: t.wealthAndChit, icon: Coins },
     { to: '/contributions' as const, label: t.contributions, icon: Wallet },
     { to: '/loans' as const, label: t.loans, icon: HandCoins },
@@ -173,6 +185,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const pageTitles: Record<string, string> = {
     '/dashboard': t.circleOverview,
+    '/profile': t.profile,
     '/wealth': t.wealthAndChit,
     '/contributions': t.contributions,
     '/loans': t.loans,
@@ -194,23 +207,78 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col border-r bg-sidebar lg:flex">
-        <div className="px-6 pb-7 pt-8">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[232px] flex-col border-r bg-sidebar lg:flex overflow-y-auto overflow-x-hidden overscroll-contain">
+        <div className="px-6 pb-6 pt-7 shrink-0">
           <Brand />
         </div>
 
-        <div className="mx-4 rounded-xl border bg-card px-3 py-3">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-semibold tracking-[.13em] text-muted-foreground">YOUR CIRCLE</span>
-            <ChevronsUpDown size={13} className="text-muted-foreground" />
+        {role === 'Super Admin' ? (
+          <Popover open={circleSwitchOpen} onOpenChange={setCircleSwitchOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="mx-4 rounded-xl border bg-card px-3 py-3 text-left transition-all hover:border-primary/50 hover:bg-muted/40 cursor-pointer shadow-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-semibold tracking-[.13em] text-primary">SWITCH MAHALL</span>
+                  <ChevronsUpDown size={13} className="text-muted-foreground" />
+                </div>
+                <p className="mt-2 text-xs font-bold text-foreground">{circle?.name ?? 'Mahallu Qard Hasan'}</p>
+                <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{circle?.mosque ?? 'Perinthalmanna Juma Masjid'}</p>
+                <div className="mt-2 flex items-center gap-1.5 text-[10px] text-primary font-semibold">
+                  <span className="size-1.5 rounded-full bg-primary" />
+                  <span>Active Context · Click to change</span>
+                </div>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="right" align="start" className="w-[260px] p-2 rounded-2xl shadow-xl">
+              <div className="px-2 py-1.5 border-b mb-1.5">
+                <p className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">Federation Mahalls</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Select active circle for entire app</p>
+              </div>
+              <div className="space-y-1 max-h-[260px] overflow-y-auto">
+                {allCircles.map((c) => {
+                  const isActive = circle?.id === c.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={async () => {
+                        await switchCircle(c.id);
+                        toast.success(`Switched active circle to: ${c.name}`);
+                        setCircleSwitchOpen(false);
+                      }}
+                      className={`w-full rounded-xl p-2 text-left transition-colors flex items-start justify-between gap-2 cursor-pointer ${
+                        isActive
+                          ? 'bg-primary/10 border border-primary/30 text-primary'
+                          : 'hover:bg-muted text-foreground'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold truncate">{c.name}</p>
+                        <p className="text-[10px] text-muted-foreground truncate">{c.mosque}</p>
+                      </div>
+                      {isActive && <Check size={14} className="text-primary mt-0.5 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <div className="mx-4 rounded-xl border bg-card px-3 py-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-semibold tracking-[.13em] text-muted-foreground">YOUR CIRCLE</span>
+              <ChevronsUpDown size={13} className="text-muted-foreground" />
+            </div>
+            <p className="mt-2 text-xs font-semibold">{circle?.name ?? 'Mahallu Qard Hasan'}</p>
+            <p className="mt-1 truncate text-[10px] text-muted-foreground">{circle?.mosque ?? 'Perinthalmanna Juma Masjid'}</p>
+            <div className="mt-2 flex items-center gap-1.5 text-[10px] text-primary">
+              <span className="size-1.5 rounded-full bg-primary" />
+              Active circle
+            </div>
           </div>
-          <p className="mt-2 text-xs font-semibold">{circle?.name ?? 'Mahallu Qard Hasan'}</p>
-          <p className="mt-1 truncate text-[10px] text-muted-foreground">{circle?.mosque ?? 'Perinthalmanna Juma Masjid'}</p>
-          <div className="mt-2 flex items-center gap-1.5 text-[10px] text-primary">
-            <span className="size-1.5 rounded-full bg-primary" />
-            Active circle
-          </div>
-        </div>
+        )}
 
         <div className="mt-6 px-4">
           <Button
@@ -314,23 +382,24 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="mt-4 border-t pt-4">
             <div className="flex items-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setAuthModalOpen(true)}
-                className="flex size-8 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-primary transition-transform hover:scale-105"
-                title="Manage account"
+              <Link
+                to="/profile"
+                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] font-semibold text-primary transition-transform hover:scale-105"
+                title="View My Profile"
               >
                 {user?.initials ?? 'AK'}
-              </button>
-              <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setAuthModalOpen(true)}>
-                <p className="truncate text-xs font-medium">{user?.name ?? 'Abdul Kareem'}</p>
+              </Link>
+              <Link to="/profile" className="min-w-0 flex-1 group">
+                <p className="truncate text-xs font-medium group-hover:text-primary transition-colors">
+                  {user?.name ?? 'Abdul Kareem'}
+                </p>
                 <div className="flex items-center gap-1">
                   <p className="truncate text-[9px] text-muted-foreground">{role}</p>
                   {isFirebaseUser && (
                     <span className="size-1.5 rounded-full bg-emerald-500" title="Firebase User" />
                   )}
                 </div>
-              </div>
+              </Link>
               <Button
                 variant="ghost"
                 size="icon"
@@ -438,29 +507,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
             <div className="hidden h-6 border-l sm:block" />
 
-            {isFirebaseUser ? (
-              <button
-                type="button"
-                onClick={() => setAuthModalOpen(true)}
-                className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
-                title="Manage Firebase Account"
-              >
-                <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                  {user?.initials ?? 'U'}
-                </span>
-                <span className="hidden sm:inline font-medium">{user?.name?.split(' ')[0]}</span>
-              </button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setAuthModalOpen(true)}
-                className="gap-1.5 rounded-xl border-primary/30 text-xs font-semibold text-primary hover:bg-primary/10"
-              >
-                <LogIn size={13} />
-                <span>Sign In</span>
-              </Button>
-            )}
+            <Link
+              to="/profile"
+              className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/20"
+              title="View My Member Profile"
+            >
+              <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                {user?.initials ?? 'U'}
+              </span>
+              <span className="hidden sm:inline font-medium">{user?.name?.split(' ')[0]}</span>
+            </Link>
           </div>
         </header>
 
@@ -477,19 +533,19 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Mobile Navigation */}
-      <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav aria-label="Mobile navigation" className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t bg-card pb-[env(safe-area-inset-bottom)] lg:hidden">
         {navigation.map(({ to, label, icon: Icon }) => (
           <Button
             asChild
             variant="ghost"
             key={to}
-            className={`h-16 flex-col gap-1 rounded-none px-1 text-[9px] ${
-              pathname === to ? 'text-primary bg-secondary/60' : 'text-muted-foreground'
+            className={`h-16 flex-col gap-1 rounded-none px-1 text-[8px] sm:text-[9px] ${
+              pathname === to ? 'text-primary bg-secondary/60 font-bold' : 'text-muted-foreground'
             }`}
           >
             <Link to={to}>
-              <Icon size={20} />
-              {label === 'Transparent ledger' ? 'Ledger' : label}
+              <Icon size={18} />
+              <span className="truncate max-w-[48px]">{label === 'Transparent ledger' ? 'Ledger' : label === 'Circle Overview' ? 'Overview' : label === 'Wealth & Chit Fund' ? 'Wealth' : label}</span>
             </Link>
           </Button>
         ))}

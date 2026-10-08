@@ -2,15 +2,11 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Sparkles,
-  Gavel,
   Dice5,
   X,
   Award,
-  CheckCircle2,
-  Coins,
   ShieldCheck,
-  Zap,
-  ArrowRight
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Money } from '@/components/shared';
@@ -34,14 +30,11 @@ export function ChitDrawModal({
   onDrawCompleted
 }: ChitDrawModalProps) {
   const [mounted, setMounted] = useState(false);
-  const [mode, setMode] = useState<'Auction' | 'Lucky Draw'>(round.mode || 'Auction');
   const [selectedWinnerId, setSelectedWinnerId] = useState<string>('');
-  const [discountBid, setDiscountBid] = useState<number>(mode === 'Auction' ? 3000 : 0);
   const [drawing, setDrawing] = useState(false);
   const [drawResult, setDrawResult] = useState<{
     winnerName: string;
     payout: number;
-    dividend: number;
     hash: string;
   } | null>(null);
 
@@ -52,9 +45,9 @@ export function ChitDrawModal({
   useEffect(() => {
     if (isOpen) {
       setDrawResult(null);
-      setDiscountBid(mode === 'Auction' ? 3000 : 0);
+      setSelectedWinnerId('');
     }
-  }, [isOpen, mode]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -93,18 +86,15 @@ export function ChitDrawModal({
         return;
       }
 
-      const effectiveDiscount = mode === 'Auction' ? discountBid : 0;
-      const payout = round.potAmount - effectiveDiscount;
-      const dividend = Math.round(effectiveDiscount / 12);
+      const payout = round.potAmount;
 
       await new Promise((resolve) => setTimeout(resolve, 1400));
 
-      const updated = await wealthService.conductChitDraw(round.id, winner.userId, winner.userName, effectiveDiscount);
+      const updated = await wealthService.conductChitDraw(round.id, winner.userId, winner.userName, 0);
 
       setDrawResult({
         winnerName: winner.userName,
         payout,
-        dividend,
         hash: updated.entropyHash || '0x4f82a728b109e2...'
       });
 
@@ -132,11 +122,11 @@ export function ChitDrawModal({
         <div className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-2xl bg-gold-soft text-gold-foreground">
-              <Sparkles size={20} strokeWidth={1.8} />
+              <Dice5 size={20} strokeWidth={1.8} />
             </span>
             <div>
               <h2 id="draw-modal-title" className="font-display text-xl font-bold">
-                Conduct Chit Pot Draw · Round #{round.roundNumber}
+                Conduct Lucky Draw · Round #{round.roundNumber}
               </h2>
               <p className="text-xs text-muted-foreground">{round.month} · Total Pot: <Money amount={round.potAmount} /></p>
             </div>
@@ -155,20 +145,15 @@ export function ChitDrawModal({
 
             <div>
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Round #{round.roundNumber} Winner Declared
+                Round #{round.roundNumber} Lucky Draw Winner
               </span>
               <h3 className="mt-1 font-display text-2xl font-bold text-foreground">{drawResult.winnerName}</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 rounded-2xl border bg-secondary/30 p-4 text-left">
-              <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase">POT PAYOUT TO WINNER</p>
-                <p className="mt-1 text-lg font-bold text-foreground"><Money amount={drawResult.payout} /></p>
-              </div>
-              <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase">DIVIDEND PER MEMBER</p>
-                <p className="mt-1 text-lg font-bold text-primary">+<Money amount={drawResult.dividend} /></p>
-              </div>
+            <div className="rounded-2xl border bg-secondary/30 p-4 text-center">
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase">FULL POT PAYOUT TO WINNER</p>
+              <p className="mt-1 text-2xl font-bold text-foreground"><Money amount={drawResult.payout} /></p>
+              <p className="mt-1 text-[11px] text-muted-foreground">100% Principal Protected · 0% Deductions</p>
             </div>
 
             <div className="rounded-xl border bg-card p-3 text-left text-xs text-muted-foreground font-mono">
@@ -186,86 +171,30 @@ export function ChitDrawModal({
         ) : (
           /* Draw Setup Form */
           <div className="mt-5 space-y-5">
-            {/* Mode selection */}
-            <div>
-              <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Draw Methodology
-              </label>
-              <div className="mt-2 grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('Auction');
-                    setDiscountBid(3000);
-                  }}
-                  className={`flex items-center gap-2.5 rounded-2xl border p-3 text-left transition-all ${
-                    mode === 'Auction'
-                      ? 'border-gold bg-gold-soft/50 text-gold-foreground font-semibold ring-1 ring-gold/40'
-                      : 'border-border bg-card hover:bg-secondary text-muted-foreground'
-                  }`}
-                >
-                  <Gavel size={18} className="text-gold" />
-                  <div>
-                    <p className="text-xs font-semibold">Sealed-Bid Auction</p>
-                    <p className="text-[10px] text-muted-foreground">Discount split as dividend</p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('Lucky Draw');
-                    setDiscountBid(0);
-                  }}
-                  className={`flex items-center gap-2.5 rounded-2xl border p-3 text-left transition-all ${
-                    mode === 'Lucky Draw'
-                      ? 'border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary/40'
-                      : 'border-border bg-card hover:bg-secondary text-muted-foreground'
-                  }`}
-                >
-                  <Dice5 size={18} className="text-primary" />
-                  <div>
-                    <p className="text-xs font-semibold">Verifiable Lucky Draw</p>
-                    <p className="text-[10px] text-muted-foreground">Pyth Entropy random pick</p>
-                  </div>
-                </button>
+            {/* Shariah Lucky Draw Info Badge */}
+            <div className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3.5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Dice5 size={18} />
+              </span>
+              <div>
+                <p className="text-xs font-semibold text-foreground">Verifiable Lucky Draw Model</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Randomly selects one eligible member to receive the complete <Money amount={round.potAmount} className="font-semibold text-foreground" /> pot without any auction discounts or reductions.
+                </p>
               </div>
             </div>
-
-            {/* Auction discount bid slider */}
-            {mode === 'Auction' && (
-              <div className="rounded-2xl border bg-secondary/30 p-4">
-                <div className="flex items-center justify-between text-xs font-medium">
-                  <span>Winning Discount Bid:</span>
-                  <span className="font-bold text-foreground"><Money amount={discountBid} /></span>
-                </div>
-                <input
-                  type="range"
-                  min="500"
-                  max="6000"
-                  step="250"
-                  value={discountBid}
-                  onChange={(e) => setDiscountBid(Number(e.target.value))}
-                  className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-lg bg-zinc-200 accent-primary dark:bg-zinc-700"
-                />
-                <div className="mt-2 flex justify-between text-[10px] text-muted-foreground">
-                  <span>Winner Takes: <Money amount={round.potAmount - discountBid} className="font-semibold text-foreground" /></span>
-                  <span>Dividend / Member: <span className="font-semibold text-primary">+<Money amount={Math.round(discountBid / 12)} /></span></span>
-                </div>
-              </div>
-            )}
 
             {/* Eligible members list */}
             <div>
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                Eligible Members ({eligibleMembers.length} remaining to win pot)
+                Eligible Members ({eligibleMembers.length} remaining in rotation)
               </label>
               <select
                 value={selectedWinnerId}
                 onChange={(e) => setSelectedWinnerId(e.target.value)}
-                className="mt-2 w-full rounded-xl border bg-background px-3 py-2 text-xs font-medium text-foreground focus:outline-primary"
+                className="mt-2 w-full rounded-xl border bg-background px-3 py-2.5 text-xs font-medium text-foreground focus:outline-primary"
               >
-                <option value="">Random from eligible members (Verifiable)</option>
+                <option value="">🎯 Verifiable Random Lucky Draw (All {eligibleMembers.length} members)</option>
                 {eligibleMembers.map((m) => (
                   <option key={m.userId} value={m.userId}>
                     {m.userName} (Contributed: ₹{m.totalContributed})
@@ -288,12 +217,12 @@ export function ChitDrawModal({
                 {drawing ? (
                   <>
                     <Zap size={14} className="animate-spin" />
-                    Executing Cryptographic Draw...
+                    Executing Lucky Draw...
                   </>
                 ) : (
                   <>
                     <Sparkles size={14} />
-                    Settle Round #{round.roundNumber} Draw
+                    Run Lucky Draw · Round #{round.roundNumber}
                   </>
                 )}
               </Button>

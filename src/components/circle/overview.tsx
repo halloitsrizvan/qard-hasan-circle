@@ -29,7 +29,8 @@ import {
   ShieldCheck,
   Sparkles,
   Users,
-  Wallet
+  Wallet,
+  RotateCcw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -44,7 +45,8 @@ import {
 import { circleQueries } from '@/lib/services';
 import { useDemo } from '@/lib/demo-context';
 import { useI18n } from '@/lib/i18n';
-import { RequestLoanModal, ContributeModal, DemoTourModal } from './modals';
+import { RequestLoanModal, ContributeModal, DemoTourModal, LoanDetailModal } from './modals';
+import type { Loan } from '@/lib/types';
 import pattern from '@/assets/circle-pattern.jpg';
 
 function AnimatedBalance({ amount }: { amount: number }) {
@@ -77,6 +79,11 @@ export function OverviewPage() {
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [contributeModalOpen, setContributeModalOpen] = useState(false);
   const [demoTourOpen, setDemoTourOpen] = useState(false);
+  const [selectedRepayLoan, setSelectedRepayLoan] = useState<Loan | null>(null);
+
+  const userActiveLoan = loans.find(
+    (l) => l.userId === user?.id && ['Active', 'Overdue'].includes(l.status) && (l.repaid || 0) < l.amount
+  );
 
   let contributions = 0,
     lent = 0;
@@ -149,6 +156,14 @@ export function OverviewPage() {
               <div className="mt-1 text-[39px] font-medium leading-tight sm:text-[44px]">
                 <AnimatedBalance amount={stats.available} />
               </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-hero-muted">
+                <span className="rounded-md bg-hero-muted/20 px-2 py-0.5 text-hero-foreground font-medium">
+                  70% Emergency Qard: <Money amount={stats.availableToLend ?? wealth.emergencyPool} />
+                </span>
+                <span className="rounded-md bg-hero-muted/20 px-2 py-0.5 text-hero-foreground font-medium">
+                  30% Chit Pot: <Money amount={wealth.wealthPool} />
+                </span>
+              </div>
               <div className="mt-3 flex items-center gap-3 text-[10px] text-hero-muted">
                 <span className="flex items-center gap-1.5">
                   <Users size={13} />
@@ -171,14 +186,24 @@ export function OverviewPage() {
                   <CirclePlus size={15} />
                   {t.contribute}
                 </Button>
-                <Button
-                  onClick={() => setRequestModalOpen(true)}
-                  variant="outline"
-                  className="h-10 border-hero-muted/35 bg-hero/30 px-4 text-hero-foreground hover:bg-hero-muted/10 hover:text-hero-foreground font-medium"
-                >
-                  <HandCoins size={15} />
-                  {t.requestLoan}
-                </Button>
+                {userActiveLoan ? (
+                  <Button
+                    onClick={() => setSelectedRepayLoan(userActiveLoan)}
+                    className="h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 shadow-md gap-1.5"
+                  >
+                    <RotateCcw size={15} />
+                    <span>Repay Loan</span>
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => setRequestModalOpen(true)}
+                    variant="outline"
+                    className="h-10 border-hero-muted/35 bg-hero/30 px-4 text-hero-foreground hover:bg-hero-muted/10 hover:text-hero-foreground font-medium"
+                  >
+                    <HandCoins size={15} />
+                    {t.requestLoan}
+                  </Button>
+                )}
               </div>
             </RoleGate>
           </div>
@@ -218,13 +243,13 @@ export function OverviewPage() {
         <StatCard
           title={t.totalContributed}
           amount={stats.contributed}
-          note="14 contributions, one purpose"
+          note={`${entries.filter((e) => e.type === 'Contribution').length} pool contributions`}
           icon={Wallet}
         />
         <StatCard
           title={t.currentlyLent}
           amount={stats.lentOut}
-          note="2 families being supported"
+          note={`${active.length} ${active.length === 1 ? 'family' : 'families'} being supported`}
           icon={HandCoins}
         />
         <StatCard
@@ -235,8 +260,8 @@ export function OverviewPage() {
         />
         <StatCard
           title={t.availableToLend}
-          amount={stats.available}
-          note="Ready for someone in need"
+          amount={stats.availableToLend ?? wealth.emergencyPool ?? Math.round(stats.contributed * ((wealth.emergencyRatio || 70) / 100))}
+          note={`${wealth.emergencyRatio || 70}% emergency lending pool`}
           icon={Banknote}
         />
       </div>
@@ -290,11 +315,11 @@ export function OverviewPage() {
                   dy={8}
                 />
                 <YAxis
-                  tickFormatter={(v) => `₹${v / 1000}k`}
+                  tickFormatter={(v) => `₹${v >= 1000 ? Math.round(v / 1000) + 'k' : v}`}
                   tick={{ fontSize: 9, fill: 'var(--muted-foreground)' }}
                   axisLine={false}
                   tickLine={false}
-                  ticks={[0, 50000, 100000, 150000, 200000]}
+                  domain={[0, 'auto']}
                 />
                 <Tooltip
                   content={({ active, payload, label }) =>
@@ -363,103 +388,274 @@ export function OverviewPage() {
         </section>
       </div>
 
-      {/* Active Loans & Recent Ledger */}
-      <div className="mt-6 grid gap-5 xl:grid-cols-[1fr_340px]">
-        <section className="min-w-0 rounded-2xl border bg-card p-5 shadow-soft">
-          <SectionHeading
-            title={role === 'Guarantor' ? 'Requests in your circle' : 'Loans that make a difference'}
-            subtitle="Small acts of support. Meaningful new beginnings."
-            action={
-              <Button asChild variant="link" className="h-auto p-0 text-[10px]">
+      {/* Active Loans & Recent Ledger (Real-Time Live Data) */}
+      <div className="mt-6 grid gap-5 xl:grid-cols-[1fr_360px]">
+        {/* Real-time Loans Section */}
+        <section className="min-w-0 rounded-2xl border bg-card p-5 shadow-soft space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-1 border-b border-border/60">
+            <div>
+              <div className="flex items-center gap-2">
+                <SectionHeading
+                  title={role === 'Guarantor' ? 'Requests in your circle' : 'Loans that make a difference'}
+                  subtitle="Small acts of support. Meaningful new beginnings."
+                />
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="relative flex size-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full size-1.5 bg-emerald-500" />
+                  </span>
+                  Live ({active.length})
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {userActiveLoan ? (
+                <Button
+                  size="sm"
+                  onClick={() => setSelectedRepayLoan(userActiveLoan)}
+                  className="h-7 text-[11px] rounded-xl font-bold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
+                >
+                  <RotateCcw size={13} />
+                  <span>Repay Loan</span>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setRequestModalOpen(true)}
+                  className="h-7 text-[11px] rounded-xl font-bold gap-1 cursor-pointer"
+                >
+                  <CirclePlus size={13} className="text-primary" />
+                  <span>Request Loan</span>
+                </Button>
+              )}
+
+              <Button asChild variant="ghost" size="sm" className="h-7 text-[11px] font-semibold text-primary">
                 <Link to="/loans">
-                  View all <ArrowRight size={12} />
+                  <span>View all</span>
+                  <ArrowRight size={12} className="ml-1" />
                 </Link>
               </Button>
-            }
-          />
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b text-[9px] font-medium text-muted-foreground">
-                  <th className="pb-3 font-medium">{role === 'Committee Admin' ? 'MEMBER' : 'LOAN'}</th>
-                  <th className="pb-3 font-medium">PRINCIPAL</th>
-                  <th className="pb-3 font-medium">STATUS</th>
-                  <th className="pb-3 text-right font-medium">REPAID</th>
-                </tr>
-              </thead>
-              <tbody>
-                {active.map((l) => {
-                  const borrower = members.find((m) => m.user.id === l.userId)?.user;
-                  return (
-                    <tr key={l.id} className="border-b last:border-0">
-                      <td className="py-4 pr-3">
-                        <div className="flex items-center gap-2">
-                          <span className="hidden size-8 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] text-primary sm:flex">
-                            {role === 'Committee Admin' ? borrower?.initials : <HandCoins size={14} />}
-                          </span>
-                          <div>
-                            <p className="whitespace-nowrap text-[11px] font-medium">
-                              {role === 'Committee Admin' ? borrower?.name : l.id}
-                            </p>
-                            <p className="mt-1 text-[9px] text-muted-foreground">
-                              {role === 'Committee Admin' ? l.purpose : 'Community support'}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="pr-3 text-[11px] font-medium">
-                        <Money amount={l.amount} />
-                      </td>
-                      <td className="pr-2">
-                        <StatusChip status={l.status} />
-                      </td>
-                      <td className="text-right text-[10px] text-muted-foreground">
-                        {Math.round((l.repaid / l.amount) * 100)}%
-                        <div className="ml-auto mt-2 h-1 w-12 overflow-hidden rounded-full bg-secondary">
-                          <div className={l.repaid > 0 ? 'h-full w-1/4 rounded-full bg-primary' : 'h-full w-0'} />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            </div>
           </div>
+
+          {active.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-8 text-center space-y-3">
+              <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <HandCoins size={20} />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-foreground">No active loan requests</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  100% of the Mahallu treasury is available for zero-interest Qard Hasan support.
+                </p>
+              </div>
+              {userActiveLoan ? (
+                <Button
+                  size="sm"
+                  onClick={() => setSelectedRepayLoan(userActiveLoan)}
+                  className="rounded-xl text-xs font-bold gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  <RotateCcw size={13} />
+                  <span>Repay Active Loan</span>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => setRequestModalOpen(true)}
+                  className="rounded-xl text-xs font-bold gap-1.5"
+                >
+                  <CirclePlus size={13} />
+                  <span>Submit First Loan Request</span>
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <th className="pb-3 font-semibold">BORROWER & PURPOSE</th>
+                    <th className="pb-3 font-semibold">PRINCIPAL</th>
+                    <th className="pb-3 font-semibold">STATUS</th>
+                    <th className="pb-3 text-right font-semibold">REPAYMENT PROGRESS</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {[...active]
+                    .sort((a, b) => b.id.localeCompare(a.id))
+                    .map((l) => {
+                      const borrower = members.find((m) => m.user.id === l.userId)?.user;
+                      const repaidPct = l.amount > 0 ? Math.min(100, Math.round(((l.repaid || 0) / l.amount) * 100)) : 0;
+
+                      return (
+                        <tr key={l.id} className="hover:bg-muted/30 transition-colors">
+                          {/* Borrower & Purpose */}
+                          <td className="py-3.5 pr-3">
+                            <div className="flex items-center gap-2.5">
+                              <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-[11px] font-bold text-primary">
+                                {borrower?.initials || l.userId.slice(0, 2).toUpperCase()}
+                              </span>
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold text-foreground text-[12px]">
+                                  {borrower?.name || `Member (${l.userId})`}
+                                </p>
+                                <p className="truncate text-[10px] text-muted-foreground">
+                                  {l.purpose || 'Emergency assistance'} · {l.months}m tenure
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Principal Amount */}
+                          <td className="pr-3 text-[12px] font-bold text-foreground font-mono">
+                            <Money amount={l.amount} />
+                          </td>
+
+                          {/* Status */}
+                          <td className="pr-2">
+                            <StatusChip status={l.status} />
+                          </td>
+
+                          {/* Progress */}
+                          <td className="text-right text-[11px] font-medium">
+                            <div className="flex items-center justify-end gap-1.5 font-semibold text-foreground">
+                              <span><Money amount={l.repaid || 0} /></span>
+                              <span className="text-muted-foreground text-[10px]">({repaidPct}%)</span>
+                            </div>
+                            <div className="ml-auto mt-1.5 h-1.5 w-24 overflow-hidden rounded-full bg-muted border border-border/40">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  repaidPct >= 100
+                                    ? 'bg-emerald-500'
+                                    : repaidPct > 0
+                                    ? 'bg-primary'
+                                    : 'bg-muted-foreground/30'
+                                }`}
+                                style={{ width: `${repaidPct}%` }}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
-        <section className="rounded-2xl border bg-card p-5 shadow-soft">
-          <SectionHeading
-            title="The latest in our ledger"
-            action={
-              <Button asChild variant="ghost" size="icon" className="size-6 text-muted-foreground">
-                <Link to="/ledger" aria-label="View ledger">
-                  <ArrowUpRight size={14} />
+        {/* Real-time Ledger Section */}
+        <section className="rounded-2xl border bg-card p-5 shadow-soft space-y-4 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <SectionHeading title="The latest in our ledger" />
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 border border-primary/20 px-2 py-0.5 text-[9px] font-bold text-primary">
+                  Live Sync
+                </span>
+              </div>
+              <Button asChild variant="ghost" size="icon" className="size-7 rounded-xl text-muted-foreground hover:text-primary">
+                <Link to="/ledger" aria-label="View full ledger">
+                  <ArrowUpRight size={15} />
                 </Link>
               </Button>
-            }
-          />
-          {entries
-            .slice(-3)
-            .reverse()
-            .map((e) => (
-              <div key={e.id} className="flex items-center gap-3 border-b py-3.5 first:pt-0 last:border-0">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
-                  <ArrowDownLeft size={16} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-medium">
-                    {e.type === 'Repayment' ? 'Installment received' : 'Pool contribution'}
-                  </p>
-                  <p className="mt-1 text-[9px] text-muted-foreground">
-                    {formatDate(e.date)} · {e.id}
+            </div>
+
+            {/* Real-Time Latest Ledger Entries */}
+            {entries.length === 0 ? (
+              <div className="py-8 text-center space-y-2">
+                <div className="mx-auto flex size-8 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <Coins size={16} />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-foreground">No ledger transactions yet</p>
+                  <p className="text-[10px] text-muted-foreground max-w-[240px] mx-auto mt-0.5">
+                    Contributions and repayments will appear here in real-time.
                   </p>
                 </div>
-                <Money amount={e.amount} sign className="text-[11px] font-medium text-primary" />
               </div>
-            ))}
-          <div className="mt-3 flex items-center gap-1.5 rounded-lg bg-secondary/50 p-2.5 text-[9px] text-primary">
-            <ShieldCheck size={13} />
-            Every entry recorded. Every rupee accounted for.
+            ) : (
+              <div className="divide-y divide-border/60">
+                {[...entries]
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.id.localeCompare(a.id))
+                  .slice(0, 4)
+                  .map((e) => {
+                    const isInflow = e.amount >= 0;
+                    const isRepayment = e.type === 'Repayment';
+                    const isContribution = e.type === 'Contribution';
+                    const isDisbursement = e.type === 'Disbursement';
+
+                    return (
+                      <div key={e.id} className="flex items-center gap-3 py-3 hover:bg-muted/20 transition-colors px-1 rounded-xl">
+                        {/* Icon */}
+                        <span
+                          className={`flex size-8 shrink-0 items-center justify-center rounded-xl text-xs ${
+                            isRepayment
+                              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20'
+                              : isContribution
+                              ? 'bg-primary/15 text-primary border border-primary/20'
+                              : isDisbursement
+                              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20'
+                              : 'bg-purple-500/15 text-purple-700 dark:text-purple-400 border border-purple-500/20'
+                          }`}
+                        >
+                          {isRepayment && <ArrowDownLeft size={16} />}
+                          {isContribution && <Coins size={16} />}
+                          {isDisbursement && <HandCoins size={16} />}
+                          {!isRepayment && !isContribution && !isDisbursement && <HeartHandshake size={16} />}
+                        </span>
+
+                        {/* Details */}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[11px] font-bold text-foreground">
+                            {isRepayment
+                              ? 'Installment received'
+                              : isContribution
+                              ? 'Monthly pool contribution'
+                              : isDisbursement
+                              ? '0% Qard disbursed'
+                              : 'Sadaqah debt sponsorship'}
+                          </p>
+                          <p className="mt-0.5 text-[9px] text-muted-foreground flex items-center gap-1.5">
+                            <span>{formatDate(e.date)}</span>
+                            <span>·</span>
+                            <span className="font-mono text-[8px] bg-muted px-1 py-0.2 rounded border border-border/50">
+                              {e.id}
+                            </span>
+                          </p>
+                        </div>
+
+                        {/* Money Amount */}
+                        <div className="text-right">
+                          <span
+                            className={`font-mono text-[11px] font-bold ${
+                              isInflow
+                                ? 'text-emerald-600 dark:text-emerald-400'
+                                : 'text-amber-600 dark:text-amber-400'
+                            }`}
+                          >
+                            {isInflow ? '+' : '-'}
+                            <Money amount={Math.abs(e.amount)} />
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+
+          {/* Cryptographic Proof Verification Footer */}
+          <div className="mt-2 rounded-xl border border-primary/20 bg-primary/5 p-2.5 text-[10px] text-primary flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 font-semibold">
+              <ShieldCheck size={14} className="shrink-0" />
+              <span>SHA-256 Immutable Proof</span>
+            </div>
+            <Link to="/ledger" className="font-bold underline hover:opacity-80 text-[9px]">
+              Audit Chain →
+            </Link>
           </div>
         </section>
       </div>
@@ -479,10 +675,18 @@ export function OverviewPage() {
         onClose={() => setRequestModalOpen(false)}
         members={members}
         maxLoan={circle?.maxLoan ?? 50000}
-        availableBalance={stats.available}
+        availableBalance={stats.availableToLend ?? stats.available}
       />
       <ContributeModal isOpen={contributeModalOpen} onClose={() => setContributeModalOpen(false)} />
       <DemoTourModal isOpen={demoTourOpen} onClose={() => setDemoTourOpen(false)} />
+      {selectedRepayLoan && (
+        <LoanDetailModal
+          loan={selectedRepayLoan}
+          onClose={() => setSelectedRepayLoan(null)}
+          borrowerName={user?.name || 'Your Active Loan'}
+          guarantorName={members.find((m) => m.user.id === selectedRepayLoan.guarantorId)?.user.name}
+        />
+      )}
     </div>
   );
 }

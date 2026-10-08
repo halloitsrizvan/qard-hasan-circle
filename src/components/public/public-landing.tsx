@@ -40,6 +40,7 @@ import { useI18n } from '@/lib/i18n';
 import { AuthModal } from '@/components/auth/auth-modal';
 import { DemoTourModal } from '@/components/circle/modals';
 import { toast } from 'sonner';
+import logoImg from '@/assets/logo.png';
 
 export function PublicLandingPage() {
   const { dark, toggleTheme, user, role, signOut, authModalOpen, setAuthModalOpen } = useDemo();
@@ -147,9 +148,9 @@ export function PublicLandingPage() {
       {/* Public Header */}
       <header className="sticky top-0 z-40 border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <a href="#" className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md shadow-primary/20">
-              <HeartHandshake size={20} strokeWidth={1.8} />
+          <a href="#" className="flex items-center gap-2.5 group">
+            <span className="flex size-9 items-center justify-center overflow-hidden rounded-xl bg-white p-1 shadow-md shadow-primary/10 ring-1 ring-border/60 transition-transform group-hover:scale-105">
+              <img src={logoImg} alt="Qard Hasan Logo" className="size-full object-contain" />
             </span>
             <span className="font-display text-lg font-bold">
               Qard Hasan <span className="font-sans text-[10px] tracking-widest text-muted-foreground uppercase">Circles</span>
@@ -192,13 +193,16 @@ export function PublicLandingPage() {
             {user ? (
               <div className="flex items-center gap-2">
                 <Button
+                  asChild
                   variant="outline"
                   size="sm"
-                  onClick={() => openAuth('signin')}
-                  className="gap-2 rounded-xl text-xs font-semibold border-primary/30"
+                  className="gap-2 rounded-xl text-xs font-bold border-primary/40 bg-card hover:bg-muted shadow-xs transition-all cursor-pointer"
                 >
-                  <span className="size-2 rounded-full bg-emerald-500" />
-                  <span>{user.name.split(' ')[0]} ({role})</span>
+                  <Link to="/dashboard" title="Open Circle Dashboard">
+                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>{user.name.split(' ')[0]} ({role})</span>
+                    <ArrowRight size={13} className="text-primary ml-0.5" />
+                  </Link>
                 </Button>
                 <Button
                   variant="ghost"
@@ -207,7 +211,7 @@ export function PublicLandingPage() {
                     await signOut();
                     toast.info('Signed out');
                   }}
-                  className="size-8 text-muted-foreground hover:text-rose-600"
+                  className="size-8 text-muted-foreground hover:text-rose-600 cursor-pointer"
                   title="Sign Out"
                   aria-label="Sign Out"
                 >
@@ -264,14 +268,27 @@ export function PublicLandingPage() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Button
-              size="lg"
-              onClick={() => openAuth('signup')}
-              className="gap-2 rounded-2xl bg-primary px-6 font-semibold text-primary-foreground shadow-xl shadow-primary/25 hover:bg-primary/90"
-            >
-              <UserPlus size={16} />
-              Join Mahallu Circle
-            </Button>
+            {user ? (
+              <Button
+                size="lg"
+                asChild
+                className="gap-2 rounded-2xl bg-primary px-6 font-bold text-primary-foreground shadow-xl shadow-primary/25 hover:bg-primary/90 cursor-pointer"
+              >
+                <Link to="/dashboard">
+                  <span>Go to Circle Dashboard</span>
+                  <ArrowRight size={16} />
+                </Link>
+              </Button>
+            ) : (
+              <Button
+                size="lg"
+                onClick={() => openAuth('signup')}
+                className="gap-2 rounded-2xl bg-primary px-6 font-semibold text-primary-foreground shadow-xl shadow-primary/25 hover:bg-primary/90"
+              >
+                <UserPlus size={16} />
+                Join Mahallu Circle
+              </Button>
+            )}
 
             <Button
               variant="outline"
@@ -979,8 +996,8 @@ export function PublicLandingPage() {
       <footer className="border-t border-border/80 bg-card py-8 text-xs text-muted-foreground">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6">
           <div className="flex items-center gap-2">
-            <span className="flex size-6 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <HeartHandshake size={14} />
+            <span className="flex size-7 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5 shadow-xs ring-1 ring-border/50">
+              <img src={logoImg} alt="Qard Hasan Logo" className="size-full object-contain" />
             </span>
             <span className="font-display font-semibold text-foreground">Qard Hasan Circles</span>
             <span className="text-muted-foreground">· Perinthalmanna Juma Masjid</span>

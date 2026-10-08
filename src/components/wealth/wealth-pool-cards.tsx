@@ -126,13 +126,15 @@ export function WealthPoolCards({ overview, onOpenAdminConfig, onOpenDrawModal }
                 </Button>
               </RoleGate>
 
-              <Button
-                onClick={onOpenDrawModal}
-                className="h-10 bg-hero-foreground px-4 text-xs font-medium text-hero hover:bg-hero-foreground/90"
-              >
-                <Sparkles size={14} />
-                Active Round #{activeRound} Draw
-              </Button>
+              <RoleGate allowed={['Committee Admin']}>
+                <Button
+                  onClick={onOpenDrawModal}
+                  className="h-10 bg-hero-foreground px-4 text-xs font-medium text-hero hover:bg-hero-foreground/90"
+                >
+                  <Sparkles size={14} />
+                  Active Round #{activeRound} Draw
+                </Button>
+              </RoleGate>
             </div>
           </div>
         </div>
@@ -207,13 +209,32 @@ export function WealthPoolCards({ overview, onOpenAdminConfig, onOpenDrawModal }
           </div>
 
           <div className="mt-5">
-            <p className="text-[11px] text-muted-foreground">Accumulated Wealth & Chit Pool</p>
+            <p className="text-[11px] text-muted-foreground">Available Wealth & Chit Pool</p>
             <div className="mt-1 text-3xl font-semibold tracking-tight">
               <AnimatedNumber value={wealthPool} />
             </div>
+            {overview.totalChitDisbursed ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Net remaining after deducting <Money amount={overview.totalChitDisbursed} className="font-medium text-amber-600" /> paid to past winners
+              </p>
+            ) : null}
           </div>
 
           <div className="mt-5 space-y-2 border-t pt-4 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between">
+              <span>Total 30% Pool Allocation</span>
+              <span className="font-medium text-foreground">
+                <Money amount={overview.totalWealthAllocated ?? Math.round((totalContributed * wealthRatio) / 100)} />
+              </span>
+            </div>
+            {overview.totalChitDisbursed ? (
+              <div className="flex items-center justify-between">
+                <span>Disbursed to Past Winners</span>
+                <span className="font-semibold text-amber-600">
+                  -<Money amount={overview.totalChitDisbursed} />
+                </span>
+              </div>
+            ) : null}
             <div className="flex items-center justify-between">
               <span>Current Pot per Round</span>
               <span className="font-semibold text-foreground"><Money amount={potPerRound} /></span>

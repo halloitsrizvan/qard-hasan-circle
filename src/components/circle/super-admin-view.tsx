@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Link } from '@tanstack/react-router';
 import {
   Crown,
   Building2,
@@ -28,7 +30,12 @@ import {
   Phone,
   Mail,
   UserCheck,
-  Scale
+  Scale,
+  Lock,
+  LogIn,
+  Eye,
+  EyeOff,
+  KeyRound
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { circleService } from '@/lib/services';
@@ -41,7 +48,72 @@ import type { Circle, User, Role, SuperAdminStats, Membership } from '@/lib/type
 
 export function SuperAdminView() {
   const queryClient = useQueryClient();
-  const { role, switchCircle, circle: activeCircle } = useDemo();
+  const { role, switchRole, switchCircle, circle: activeCircle, setAuthModalOpen } = useDemo();
+
+  // Authorize /admin page ONLY for Super Admin
+  if (role !== 'Super Admin') {
+    return (
+      <div className="flex min-h-[65vh] items-center justify-center p-4">
+        <div className="w-full max-w-lg rounded-3xl border border-amber-500/30 bg-card p-7 sm:p-9 shadow-2xl text-center space-y-5 animate-in fade-in-0">
+          <div className="mx-auto flex size-16 items-center justify-center rounded-3xl bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 shadow-sm">
+            <Lock size={32} />
+          </div>
+
+          <div>
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-300 mb-2">
+              <Crown size={13} className="text-amber-500" />
+              <span>Restricted Administrative Zone</span>
+            </div>
+            <h2 className="font-display text-2xl font-bold text-foreground">
+              Super Admin Authorization Required
+            </h2>
+            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+              The <strong>/admin</strong> console is strictly authorized for the <strong>Super Administrator</strong> account (<code className="text-foreground font-semibold">qard@gmail.com</code>).
+              Your current active session (<span className="font-semibold text-primary">{role}</span>) does not possess federation-level management permissions.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-muted/40 p-4 text-xs text-left space-y-2">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Required Privilege:</span>
+              <span className="font-bold text-amber-600 dark:text-amber-400">Super Admin (Only)</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Current Active Role:</span>
+              <span className="font-semibold text-foreground">{role}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Super Admin Email:</span>
+              <span className="font-mono text-foreground font-medium">qard@gmail.com</span>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 pt-2">
+            <Button
+              onClick={() => {
+                switchRole('Super Admin');
+                toast.success('Switched session to Super Admin!');
+              }}
+              className="w-full rounded-xl py-5 font-bold gap-2 bg-amber-600 hover:bg-amber-700 text-white shadow-md shadow-amber-600/20 cursor-pointer"
+            >
+              <Crown size={16} />
+              <span>Switch to Super Admin (qard@gmail.com)</span>
+            </Button>
+
+            <Button
+              asChild
+              variant="outline"
+              className="w-full rounded-xl py-5 font-semibold text-xs"
+            >
+              <Link to="/dashboard">
+                <span>← Return to Community Dashboard</span>
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const [activeTab, setActiveTab] = useState<'mahalls' | 'members' | 'analytics'>('mahalls');
   const [searchQuery, setSearchQuery] = useState('');
@@ -70,6 +142,40 @@ export function SuperAdminView() {
   const { data: allUsersWithMahall = [], isLoading: usersLoading } = useQuery({
     queryKey: ['allUsersWithMahallu'],
     queryFn: () => circleService.getAllUsersWithMahallu()
+  });
+
+  // Delete single Mahall Mutation
+  const deleteMahallMutation = useMutation({
+    mutationFn: async (circleId: string) => {
+      return circleService.deleteMahall(circleId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allCircles'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminStats'] });
+      queryClient.invalidateQueries({ queryKey: ['allUsersWithMahallu'] });
+      queryClient.invalidateQueries({ queryKey: ['activeCircle'] });
+      toast.success('Mahall deleted successfully.');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to delete Mahall');
+    }
+  });
+
+  // Purge extra Mahalls Mutation
+  const purgeMahallsMutation = useMutation({
+    mutationFn: async () => {
+      return circleService.purgeExtraMahalls();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allCircles'] });
+      queryClient.invalidateQueries({ queryKey: ['superAdminStats'] });
+      queryClient.invalidateQueries({ queryKey: ['allUsersWithMahallu'] });
+      queryClient.invalidateQueries({ queryKey: ['activeCircle'] });
+      toast.success('Deleted extra Mahalls. Kept only Mahallu Qard Hasan Circle.');
+    },
+    onError: (err: any) => {
+      toast.error(err.message || 'Failed to purge Mahalls');
+    }
   });
 
   // Filtered members list
@@ -114,6 +220,21 @@ export function SuperAdminView() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {allCircles.length > 1 && (
+            <Button
+              onClick={async () => {
+                if (confirm('Are you sure you want to delete all other Mahalls and keep ONLY Mahallu Qard Hasan Circle?')) {
+                  await purgeMahallsMutation.mutateAsync();
+                }
+              }}
+              variant="outline"
+              className="gap-2 rounded-xl border-rose-500/30 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 font-bold text-xs shadow-sm cursor-pointer"
+            >
+              <Trash2 size={15} />
+              <span>Delete Other Mahalls</span>
+            </Button>
+          )}
+
           <Button
             onClick={() => setCreateMahallOpen(true)}
             className="gap-2 rounded-xl bg-primary text-primary-foreground font-bold text-xs shadow-md shadow-primary/20 hover:bg-primary/90"
@@ -433,6 +554,23 @@ export function SuperAdminView() {
                       <Users size={13} />
                       <span>Users</span>
                     </Button>
+
+                    {c.id !== 'mahallu' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          if (confirm(`Are you sure you want to delete ${c.name} (${c.mosque})?`)) {
+                            await deleteMahallMutation.mutateAsync(c.id);
+                          }
+                        }}
+                        className="rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 hover:text-rose-600 border-rose-500/30 gap-1 cursor-pointer"
+                        title="Delete Mahall"
+                      >
+                        <Trash2 size={13} />
+                        <span>Delete</span>
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
@@ -445,123 +583,323 @@ export function SuperAdminView() {
       {/* TAB 2: MEMBERS & ROLE MANAGEMENT (UNDER MAHALLS) */}
       {/* ========================================================================= */}
       {activeTab === 'members' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Showing <strong className="text-foreground">{filteredUsers.length}</strong> registered persons across all Mahalls.
-            </p>
+        <div className="space-y-5">
+          {/* Mahall Filter Header Card */}
+          <div className="rounded-3xl border border-border bg-card p-4 sm:p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Filter size={15} className="text-primary" />
+                  <h3 className="font-display text-sm font-bold text-foreground">
+                    Filter by Mahallu Circle
+                  </h3>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Select a specific mosque circle to isolate committee admins, members, guarantors, and auditors.
+                </p>
+              </div>
 
-            <Button
-              size="sm"
-              onClick={() => setAddMemberOpen(true)}
-              className="gap-2 rounded-xl text-xs font-bold"
-            >
-              <UserPlus size={14} />
-              <span>Assign New User</span>
-            </Button>
-          </div>
+              <div className="flex items-center gap-2">
+                {(selectedMahallFilter !== 'all' || selectedRoleFilter !== 'all' || searchQuery.trim() !== '') && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setSelectedMahallFilter('all');
+                      setSelectedRoleFilter('all');
+                      setSearchQuery('');
+                    }}
+                    className="h-8 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground gap-1.5 cursor-pointer"
+                  >
+                    <X size={13} />
+                    <span>Reset Filters</span>
+                  </Button>
+                )}
 
-          <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="border-b border-border bg-muted/50 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                  <tr>
-                    <th className="px-5 py-3.5">User / Person</th>
-                    <th className="px-5 py-3.5">Assigned Mahallu</th>
-                    <th className="px-5 py-3.5">Role Under Mahall</th>
-                    <th className="px-5 py-3.5">Status</th>
-                    <th className="px-5 py-3.5">Joined Date</th>
-                    <th className="px-5 py-3.5 text-right">Role Management</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {filteredUsers.map((item) => {
-                    const roleColor =
-                      item.user.role === 'Super Admin'
-                        ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
-                        : item.user.role === 'Committee Admin'
-                        ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
-                        : item.user.role === 'Guarantor'
-                        ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30'
-                        : item.user.role === 'Auditor'
-                        ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30'
-                        : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+                <Button
+                  size="sm"
+                  onClick={() => setAddMemberOpen(true)}
+                  className="h-8 gap-1.5 rounded-xl text-xs font-bold bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+                >
+                  <UserPlus size={14} />
+                  <span>Assign New User</span>
+                </Button>
+              </div>
+            </div>
 
-                    return (
-                      <tr key={item.user.id} className="hover:bg-muted/30 transition-colors">
-                        {/* User info */}
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
-                              {item.user.initials}
-                            </div>
-                            <div>
-                              <p className="font-bold text-foreground">{item.user.name}</p>
-                              <p className="text-[11px] text-muted-foreground">{item.user.email}</p>
-                            </div>
-                          </div>
-                        </td>
+            {/* Quick-Filter Pills: All Mahalls + Each Registered Circle */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/60">
+              {/* All Mahalls Pill */}
+              <button
+                type="button"
+                onClick={() => setSelectedMahallFilter('all')}
+                className={`group flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  selectedMahallFilter === 'all'
+                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25 ring-2 ring-primary/20'
+                    : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/60'
+                }`}
+              >
+                <Building2 size={13} className={selectedMahallFilter === 'all' ? 'text-primary-foreground' : 'text-primary'} />
+                <span>All Mahalls</span>
+                <span
+                  className={`rounded-md px-1.5 py-0.2 text-[10px] font-extrabold ${
+                    selectedMahallFilter === 'all'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-background text-foreground/80'
+                  }`}
+                >
+                  {allUsersWithMahall.length}
+                </span>
+              </button>
 
-                        {/* Mahallu info */}
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <Landmark size={14} className="text-primary shrink-0" />
-                            <span className="font-semibold text-foreground">
-                              {item.circle?.mosque || 'Mahallu Qard Hasan Circle'}
-                            </span>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground block ml-5">
-                            {item.circle?.location || 'Kerala'}
-                          </span>
-                        </td>
+              {/* Individual Circles Pills */}
+              {allCircles.map((circleItem) => {
+                const count = allUsersWithMahall.filter(
+                  (u) => u.user.circleId === circleItem.id || u.circle?.id === circleItem.id
+                ).length;
+                const isSelected = selectedMahallFilter === circleItem.id;
 
-                        {/* Role under Mahall */}
-                        <td className="px-5 py-3.5">
-                          <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-bold ${roleColor}`}>
-                            {item.user.role === 'Super Admin' && <Crown size={12} className="text-amber-500" />}
-                            {item.user.role === 'Committee Admin' && <ShieldCheck size={12} />}
-                            {item.user.role === 'Guarantor' && <UserCheck size={12} />}
-                            {item.user.role === 'Auditor' && <Scale size={12} />}
-                            {item.user.role === 'Member' && <Users size={12} />}
-                            <span>{item.user.role}</span>
-                          </span>
-                        </td>
+                return (
+                  <button
+                    key={circleItem.id}
+                    type="button"
+                    onClick={() => setSelectedMahallFilter(circleItem.id)}
+                    className={`group flex items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/25 ring-2 ring-primary/20 font-bold'
+                        : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/60'
+                    }`}
+                  >
+                    <Landmark size={13} className={isSelected ? 'text-primary-foreground' : 'text-primary'} />
+                    <span className="truncate max-w-[150px] sm:max-w-[180px]">{circleItem.mosque}</span>
+                    <span
+                      className={`rounded-md px-1.5 py-0.2 text-[10px] font-extrabold ${
+                        isSelected
+                          ? 'bg-white/20 text-white'
+                          : 'bg-background text-foreground/80'
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-                        {/* Status */}
-                        <td className="px-5 py-3.5">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle2 size={13} />
-                            <span>Active</span>
-                          </span>
-                        </td>
+            {/* Sub-Filter Controls: Role Selector & Search Stats */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 text-xs border-t border-border/40">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-muted-foreground mr-1">Role:</span>
+                {[
+                  { label: 'All Roles', value: 'all' },
+                  { label: 'Committee Admin', value: 'Committee Admin' },
+                  { label: 'Member', value: 'Member' },
+                  { label: 'Guarantor', value: 'Guarantor' },
+                  { label: 'Auditor', value: 'Auditor' }
+                ].map((r) => (
+                  <button
+                    key={r.value}
+                    type="button"
+                    onClick={() => setSelectedRoleFilter(r.value)}
+                    className={`rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                      selectedRoleFilter === r.value
+                        ? 'bg-foreground text-background font-bold shadow-xs'
+                        : 'bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
 
-                        {/* Date */}
-                        <td className="px-5 py-3.5 text-muted-foreground text-[11px]">
-                          {item.user.joinedAt || '2026-01-01'}
-                        </td>
-
-                        {/* Actions */}
-                        <td className="px-5 py-3.5 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setTargetUser(item);
-                              setReassignRoleOpen(true);
-                            }}
-                            className="rounded-xl text-xs font-bold gap-1.5"
-                          >
-                            <Edit size={12} />
-                            <span>Change Role / Mahall</span>
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="text-[11px] text-muted-foreground font-medium">
+                Showing <strong className="text-foreground">{filteredUsers.length}</strong> of{' '}
+                <strong className="text-foreground">{allUsersWithMahall.length}</strong> persons
+                {selectedMahallFilter !== 'all' && (
+                  <span className="ml-1 text-primary font-semibold">
+                    (in {allCircles.find((c) => c.id === selectedMahallFilter)?.mosque || 'selected Mahall'})
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Members Table or Empty State */}
+          {filteredUsers.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center space-y-3">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+                <Users size={24} />
+              </div>
+              <div>
+                <h4 className="font-display text-sm font-bold text-foreground">
+                  No members found matching filter
+                </h4>
+                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                  {selectedMahallFilter !== 'all'
+                    ? `There are currently no registered persons under ${
+                        allCircles.find((c) => c.id === selectedMahallFilter)?.mosque || 'this Mahall'
+                      }.`
+                    : 'Try changing your search query or role filter.'}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedMahallFilter('all');
+                    setSelectedRoleFilter('all');
+                    setSearchQuery('');
+                  }}
+                  className="rounded-xl text-xs"
+                >
+                  Clear All Filters
+                </Button>
+
+                <Button
+                  size="sm"
+                  onClick={() => setAddMemberOpen(true)}
+                  className="rounded-xl text-xs font-bold gap-1.5"
+                >
+                  <UserPlus size={13} />
+                  <span>Assign First Member</span>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-border bg-card shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-border bg-muted/50 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <tr>
+                      <th className="px-5 py-3.5">User / Person</th>
+                      <th className="px-5 py-3.5">Assigned Mahallu</th>
+                      <th className="px-5 py-3.5">Role Under Mahall</th>
+                      <th className="px-5 py-3.5">Monthly Commitment</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5">Joined Date</th>
+                      <th className="px-5 py-3.5 text-right">Role Management</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredUsers.map((item) => {
+                      const roleColor =
+                        item.user.role === 'Super Admin'
+                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                          : item.user.role === 'Committee Admin'
+                          ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                          : item.user.role === 'Guarantor'
+                          ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30'
+                          : item.user.role === 'Auditor'
+                          ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30'
+                          : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+
+                      const isCurrentMahallFiltered =
+                        selectedMahallFilter !== 'all' &&
+                        (item.user.circleId === selectedMahallFilter || item.circle?.id === selectedMahallFilter);
+
+                      const monthlyCommitment =
+                        item.user.monthlyCommitment ?? item.membership?.monthlyCommitment ?? item.circle?.minContribution ?? 1000;
+
+                      return (
+                        <tr
+                          key={item.user.id}
+                          className={`hover:bg-muted/30 transition-colors ${
+                            isCurrentMahallFiltered ? 'bg-primary/[0.015]' : ''
+                          }`}
+                        >
+                          {/* User info */}
+                          <td className="px-5 py-3.5">
+                            <div className="flex items-center gap-3">
+                              <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary shrink-0">
+                                {item.user.initials}
+                              </div>
+                              <div>
+                                <p className="font-bold text-foreground">{item.user.name}</p>
+                                <p className="text-[11px] text-muted-foreground">{item.user.email}</p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Mahallu info with Quick Filter click */}
+                          <td className="px-5 py-3.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (item.circle?.id) {
+                                  setSelectedMahallFilter(item.circle.id);
+                                }
+                              }}
+                              className="text-left group/mahall cursor-pointer"
+                              title="Click to filter by this Mahall"
+                            >
+                              <div className="flex items-center gap-1.5">
+                                <Landmark size={13} className="text-primary shrink-0 group-hover/mahall:scale-110 transition-transform" />
+                                <span className="font-semibold text-foreground group-hover/mahall:text-primary group-hover/mahall:underline transition-colors">
+                                  {item.circle?.mosque || 'Mahallu Qard Hasan Circle'}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground block ml-5">
+                                {item.circle?.location || 'Kerala'}
+                              </span>
+                            </button>
+                          </td>
+
+                          {/* Role under Mahall */}
+                          <td className="px-5 py-3.5">
+                            <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-bold ${roleColor}`}>
+                              {item.user.role === 'Super Admin' && <Crown size={12} className="text-amber-500" />}
+                              {item.user.role === 'Committee Admin' && <ShieldCheck size={12} />}
+                              {item.user.role === 'Guarantor' && <UserCheck size={12} />}
+                              {item.user.role === 'Auditor' && <Scale size={12} />}
+                              {item.user.role === 'Member' && <Users size={12} />}
+                              <span>{item.user.role}</span>
+                            </span>
+                          </td>
+
+                          {/* Monthly Commitment */}
+                          <td className="px-5 py-3.5 font-mono font-bold text-xs text-foreground">
+                            <Money amount={monthlyCommitment} />
+                            <span className="text-[10px] text-muted-foreground font-normal">/mo</span>
+                          </td>
+
+                          {/* Status */}
+                          <td className="px-5 py-3.5">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 size={13} />
+                              <span>Active</span>
+                            </span>
+                          </td>
+
+                          {/* Date */}
+                          <td className="px-5 py-3.5 text-muted-foreground text-[11px]">
+                            {item.user.joinedAt || '2026-01-01'}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="px-5 py-3.5 text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setTargetUser(item);
+                                setReassignRoleOpen(true);
+                              }}
+                              className="rounded-xl text-xs font-bold gap-1.5 hover:border-primary/50"
+                            >
+                              <Edit size={12} />
+                              <span>Change Role / Mahall</span>
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -663,6 +1001,7 @@ export function SuperAdminView() {
       {addMemberOpen && (
         <AddMemberToMahallModal
           circles={allCircles}
+          initialCircleId={selectedMahallFilter !== 'all' ? selectedMahallFilter : undefined}
           onClose={() => setAddMemberOpen(false)}
           onSuccess={() => {
             setAddMemberOpen(false);
@@ -731,17 +1070,22 @@ function CreateMahallModal({
   const [mosque, setMosque] = useState('');
   const [location, setLocation] = useState('');
   const [balance, setBalance] = useState('100000');
-  const [minContribution, setMinContribution] = useState('3000');
+  const [minContribution, setMinContribution] = useState('1000');
   const [maxLoan, setMaxLoan] = useState('50000');
-  const [maxMonths, setMaxMonths] = useState('12');
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('123456');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !mosque.trim() || !location.trim()) {
       toast.error('Please provide Mahallu name, Mosque, and Location.');
+      return;
+    }
+    if (!adminName.trim() || !adminEmail.trim()) {
+      toast.error('Committee Admin name and email are mandatory for every new Mahallu.');
       return;
     }
 
@@ -752,14 +1096,14 @@ function CreateMahallModal({
         mosque: mosque.trim(),
         location: location.trim(),
         balance: Number(balance) || 100000,
-        minContribution: Number(minContribution) || 3000,
+        minContribution: Number(minContribution) || 1000,
         maxLoan: Number(maxLoan) || 50000,
-        maxMonths: Number(maxMonths) || 12,
-        adminName: adminName.trim() || undefined,
-        adminEmail: adminEmail.trim() || undefined
+        adminName: adminName.trim(),
+        adminEmail: adminEmail.trim(),
+        adminMonthlyCommitment: Number(minContribution) || 1000
       });
 
-      toast.success(`Successfully created Mahall: ${created.name}!`);
+      toast.success(`Successfully created Mahall: ${created.name}! Assigned ${adminName} as Committee Admin.`);
       onSuccess();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create Mahall');
@@ -768,174 +1112,220 @@ function CreateMahallModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in-0">
-      <div className="relative w-full max-w-lg rounded-3xl border border-border bg-card p-6 sm:p-7 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Building2 size={22} />
+  return typeof document !== 'undefined'
+    ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in-0">
+          <div className="relative w-full max-w-lg rounded-3xl border border-border bg-card p-6 sm:p-7 shadow-2xl space-y-5 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Building2 size={22} />
+                </div>
+                <div>
+                  <h2 className="font-display text-lg font-bold text-foreground">Create New Mahallu Circle</h2>
+                  <p className="text-[11px] text-muted-foreground">Add a new mosque & assign its Committee Admin</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X size={18} />
+              </button>
             </div>
-            <div>
-              <h2 className="font-display text-lg font-bold text-foreground">Create New Mahallu Circle</h2>
-              <p className="text-[11px] text-muted-foreground">Add a new mosque to the Qard Hasan Federation</p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <X size={18} />
-          </button>
-        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-foreground">Mahallu Circle Name</label>
-            <Input
-              required
-              placeholder="e.g. Tirur Central Qard Hasan Circle"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 h-10 rounded-xl text-xs"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-foreground">Juma Masjid / Mosque Name</label>
-              <Input
-                required
-                placeholder="e.g. Tirur Town Juma Masjid"
-                value={mosque}
-                onChange={(e) => setMosque(e.target.value)}
-                className="mt-1 h-10 rounded-xl text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-foreground">Location (City, District)</label>
-              <Input
-                required
-                placeholder="e.g. Tirur, Malappuram, Kerala"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="mt-1 h-10 rounded-xl text-xs"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <div>
-              <label className="text-[11px] font-semibold text-foreground">Initial Capital (₹)</label>
-              <Input
-                type="number"
-                value={balance}
-                onChange={(e) => setBalance(e.target.value)}
-                className="mt-1 h-9 rounded-xl text-xs font-mono"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-foreground">Min Monthly (₹)</label>
-              <Input
-                type="number"
-                value={minContribution}
-                onChange={(e) => setMinContribution(e.target.value)}
-                className="mt-1 h-9 rounded-xl text-xs font-mono"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-foreground">Max Loan (₹)</label>
-              <Input
-                type="number"
-                value={maxLoan}
-                onChange={(e) => setMaxLoan(e.target.value)}
-                className="mt-1 h-9 rounded-xl text-xs font-mono"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-foreground">Max Months</label>
-              <Input
-                type="number"
-                value={maxMonths}
-                onChange={(e) => setMaxMonths(e.target.value)}
-                className="mt-1 h-9 rounded-xl text-xs font-mono"
-              />
-            </div>
-          </div>
-
-          {/* Initial Committee Admin Assignment */}
-          <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-3.5 space-y-2.5">
-            <span className="font-bold text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-              <ShieldCheck size={14} className="text-amber-500" />
-              Assign Initial Committee Admin (Optional)
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="text-[10px] text-muted-foreground">Admin Full Name</label>
+                <label className="text-xs font-semibold text-foreground">Mahallu Circle Name *</label>
                 <Input
-                  placeholder="e.g. Usman Haji"
-                  value={adminName}
-                  onChange={(e) => setAdminName(e.target.value)}
-                  className="mt-0.5 h-9 rounded-xl text-xs bg-card"
+                  required
+                  placeholder="e.g. Tirur Central Qard Hasan Circle"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 h-10 rounded-xl text-xs"
                 />
               </div>
-              <div>
-                <label className="text-[10px] text-muted-foreground">Admin Email</label>
-                <Input
-                  type="email"
-                  placeholder="admin@mahallu.org"
-                  value={adminEmail}
-                  onChange={(e) => setAdminEmail(e.target.value)}
-                  className="mt-0.5 h-9 rounded-xl text-xs bg-card"
-                />
-              </div>
-            </div>
-          </div>
 
-          <div className="flex gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              className="flex-1 rounded-xl font-semibold"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 rounded-xl font-bold bg-primary text-primary-foreground"
-            >
-              {submitting ? 'Creating Mahall...' : 'Create & Activate Mahall'}
-            </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Juma Masjid / Mosque Name *</label>
+                  <Input
+                    required
+                    placeholder="e.g. Tirur Town Juma Masjid"
+                    value={mosque}
+                    onChange={(e) => setMosque(e.target.value)}
+                    className="mt-1 h-10 rounded-xl text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground">Location (City, District) *</label>
+                  <Input
+                    required
+                    placeholder="e.g. Tirur, Malappuram, Kerala"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="mt-1 h-10 rounded-xl text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Mandatory Committee Admin Assignment */}
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-primary flex items-center gap-1.5">
+                    <ShieldCheck size={16} className="text-primary" />
+                    Assign Committee Admin (Mandatory)
+                  </span>
+                  <span className="rounded-md bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary uppercase">
+                    Required
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground">Admin Full Name *</label>
+                    <Input
+                      required
+                      placeholder="e.g. Usman Haji"
+                      value={adminName}
+                      onChange={(e) => setAdminName(e.target.value)}
+                      className="mt-0.5 h-9 rounded-xl text-xs bg-card"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground">Admin Email *</label>
+                    <Input
+                      type="email"
+                      required
+                      placeholder="admin@mahallu.org"
+                      value={adminEmail}
+                      onChange={(e) => setAdminEmail(e.target.value)}
+                      className="mt-0.5 h-9 rounded-xl text-xs bg-card"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground">Admin Password (Login) *</label>
+                  <div className="relative mt-0.5">
+                    <Input
+                      type={showAdminPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      placeholder="Password (min 6 chars)"
+                      value={adminPassword}
+                      onChange={(e) => setAdminPassword(e.target.value)}
+                      className="h-9 rounded-xl text-xs bg-card pr-8 font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPassword(!showAdminPassword)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showAdminPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Optional Initial Financial Parameters */}
+              <div className="rounded-2xl border border-border/80 bg-muted/20 p-3.5 space-y-2.5">
+                <span className="font-bold text-[11px] text-muted-foreground uppercase tracking-wider block">
+                  Optional Parameters
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-foreground">Initial Capital (₹)</label>
+                    <Input
+                      type="number"
+                      value={balance}
+                      onChange={(e) => setBalance(e.target.value)}
+                      className="mt-1 h-9 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-foreground">Min Monthly (₹)</label>
+                    <Input
+                      type="number"
+                      value={minContribution}
+                      onChange={(e) => setMinContribution(e.target.value)}
+                      className="mt-1 h-9 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-foreground">Max Loan (₹)</label>
+                    <Input
+                      type="number"
+                      value={maxLoan}
+                      onChange={(e) => setMaxLoan(e.target.value)}
+                      className="mt-1 h-9 rounded-xl text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Dynamic Max Months Notice */}
+                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-2.5 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                  <Sparkles size={14} className="shrink-0 text-emerald-600" />
+                  <span>
+                    <strong>Repayment Term (Max Months):</strong> Scaled automatically with active Mahall members (1 month per member, min 12 months).
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  className="flex-1 rounded-xl font-semibold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 rounded-xl font-bold bg-primary text-primary-foreground"
+                >
+                  {submitting ? 'Creating Mahall...' : 'Create & Activate Mahall'}
+                </Button>
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
-    </div>
-  );
+        </div>,
+        document.body
+      )
+    : null;
 }
 
 function AddMemberToMahallModal({
   circles,
+  initialCircleId,
   onClose,
   onSuccess
 }: {
   circles: Circle[];
+  initialCircleId?: string | undefined;
   onClose: () => void;
   onSuccess: () => void;
 }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('123456');
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState('');
-  const [circleId, setCircleId] = useState(circles[0]?.id || 'mahallu');
+  const [circleId, setCircleId] = useState(initialCircleId || circles[0]?.id || 'mahallu');
   const [role, setRole] = useState<Role>('Member');
+  const [monthlyCommitment, setMonthlyCommitment] = useState('1000');
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) {
       toast.error('Please enter name and email.');
+      return;
+    }
+    if (password.length < 6) {
+      toast.error('Password must be at least 6 characters.');
       return;
     }
 
@@ -946,10 +1336,11 @@ function AddMemberToMahallModal({
         email: email.trim(),
         phone: phone.trim(),
         role,
-        circleId
+        circleId,
+        monthlyCommitment: Number(monthlyCommitment) || 1000
       });
 
-      toast.success(`Assigned ${name} as ${role} under the selected Mahall!`);
+      toast.success(`Assigned ${name} as ${role} (Monthly: ₹${Number(monthlyCommitment).toLocaleString('en-IN')})!`);
       onSuccess();
     } catch (err: any) {
       toast.error(err.message || 'Failed to assign user');
@@ -958,8 +1349,9 @@ function AddMemberToMahallModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in-0">
+  return typeof document !== 'undefined'
+    ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in-0">
       <div className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-5">
         <div className="flex items-center justify-between border-b pb-4">
           <div className="flex items-center gap-3">
@@ -968,7 +1360,7 @@ function AddMemberToMahallModal({
             </div>
             <div>
               <h2 className="font-display text-lg font-bold text-foreground">Assign User to Mahall</h2>
-              <p className="text-[11px] text-muted-foreground">Add and configure role under a specific mosque</p>
+              <p className="text-[11px] text-muted-foreground">Add member, set credentials & monthly commitment</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">
@@ -976,28 +1368,52 @@ function AddMemberToMahallModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           <div>
-            <label className="text-xs font-semibold text-foreground">Full Name</label>
+            <label className="text-xs font-semibold text-foreground">Full Name *</label>
             <Input
               required
               placeholder="e.g. Ibrahim Kutty"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 h-10 rounded-xl text-xs"
+              className="mt-1 h-9 rounded-xl text-xs"
             />
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-foreground">Email Address</label>
-            <Input
-              type="email"
-              required
-              placeholder="name@mahallu.org"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 h-10 rounded-xl text-xs"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="text-xs font-semibold text-foreground">Email Address *</label>
+              <Input
+                type="email"
+                required
+                placeholder="name@mahallu.org"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="mt-1 h-9 rounded-xl text-xs"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-foreground">Account Password *</label>
+              <div className="relative mt-1">
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  placeholder="Min 6 chars"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-9 rounded-xl text-xs pr-8 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
           </div>
 
           <div>
@@ -1006,37 +1422,56 @@ function AddMemberToMahallModal({
               placeholder="+91 98470 XXXXX"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="mt-1 h-10 rounded-xl text-xs"
+              className="mt-1 h-9 rounded-xl text-xs"
             />
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-foreground">Select Assigned Mahallu</label>
-            <select
-              value={circleId}
-              onChange={(e) => setCircleId(e.target.value)}
-              className="mt-1 block w-full rounded-xl border border-input bg-card px-3 py-2.5 text-xs font-semibold text-foreground focus:outline-none"
-            >
-              {circles.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.mosque})
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div>
+              <label className="text-xs font-semibold text-foreground">Assigned Mahallu</label>
+              <select
+                value={circleId}
+                onChange={(e) => setCircleId(e.target.value)}
+                className="mt-1 block w-full rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground focus:outline-none"
+              >
+                {circles.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.mosque})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-foreground">Role Under Mahall</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as Role)}
+                className="mt-1 block w-full rounded-xl border border-input bg-card px-3 py-2 text-xs font-semibold text-foreground focus:outline-none"
+              >
+                <option value="Member">Member (Saver / Borrower)</option>
+                <option value="Guarantor">Guarantor (Kafala / Voucher)</option>
+                <option value="Committee Admin">Committee Admin (Mahall Lead)</option>
+                <option value="Auditor">Auditor (Independent Reviewer)</option>
+              </select>
+            </div>
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-foreground">Role Under this Mahall</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as Role)}
-              className="mt-1 block w-full rounded-xl border border-input bg-card px-3 py-2.5 text-xs font-semibold text-foreground focus:outline-none"
-            >
-              <option value="Member">Member (Saver / Borrower)</option>
-              <option value="Guarantor">Guarantor (Kafala / Voucher)</option>
-              <option value="Committee Admin">Committee Admin (Mahall Lead)</option>
-              <option value="Auditor">Auditor (Independent Reviewer)</option>
-            </select>
+            <label className="text-xs font-semibold text-foreground">Assigned Monthly Commitment (₹)</label>
+            <Input
+              type="number"
+              min={100}
+              step={100}
+              required
+              placeholder="1000"
+              value={monthlyCommitment}
+              onChange={(e) => setMonthlyCommitment(e.target.value)}
+              className="mt-1 h-9 rounded-xl text-xs font-mono font-bold"
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Determines their monthly contribution and calculated stake in the Emergency Lending Fund.
+            </p>
           </div>
 
           <div className="flex gap-2 pt-2">
@@ -1049,8 +1484,10 @@ function AddMemberToMahallModal({
           </div>
         </form>
       </div>
-    </div>
-  );
+    </div>,
+    document.body
+  )
+: null;
 }
 
 function EditMahallModal({
@@ -1091,59 +1528,62 @@ function EditMahallModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in-0">
-      <div className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b pb-3">
-          <h2 className="font-display text-base font-bold text-foreground">Edit Mahallu Details</h2>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3.5">
-          <div>
-            <label className="text-xs font-semibold text-foreground">Mahallu Name</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-foreground">Mosque Name</label>
-            <Input value={mosque} onChange={(e) => setMosque(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-foreground">Location</label>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="text-[10px] text-muted-foreground">Treasury (₹)</label>
-              <Input type="number" value={balance} onChange={(e) => setBalance(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
+  return typeof document !== 'undefined'
+    ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in-0">
+          <div className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h2 className="font-display text-base font-bold text-foreground">Edit Mahallu Details</h2>
+              <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">
+                <X size={18} />
+              </button>
             </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground">Max Loan (₹)</label>
-              <Input type="number" value={maxLoan} onChange={(e) => setMaxLoan(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground">Min Deposit (₹)</label>
-              <Input type="number" value={minContribution} onChange={(e) => setMinContribution(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
-            </div>
-          </div>
 
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1 rounded-xl">
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting} className="flex-1 rounded-xl font-bold">
-              {submitting ? 'Saving...' : 'Save Changes'}
-            </Button>
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              <div>
+                <label className="text-xs font-semibold text-foreground">Mahallu Name</label>
+                <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground">Mosque Name</label>
+                <Input value={mosque} onChange={(e) => setMosque(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground">Location</label>
+                <Input value={location} onChange={(e) => setLocation(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Treasury (₹)</label>
+                  <Input type="number" value={balance} onChange={(e) => setBalance(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Max Loan (₹)</label>
+                  <Input type="number" value={maxLoan} onChange={(e) => setMaxLoan(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Min Deposit (₹)</label>
+                  <Input type="number" value={minContribution} onChange={(e) => setMinContribution(e.target.value)} className="mt-1 h-9 rounded-xl text-xs" />
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={onClose} className="flex-1 rounded-xl">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting} className="flex-1 rounded-xl font-bold">
+                  {submitting ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
-    </div>
-  );
+        </div>,
+        document.body
+      )
+    : null;
 }
 
 function ReassignRoleModal({
@@ -1175,70 +1615,73 @@ function ReassignRoleModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in-0">
-      <div className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b pb-3">
-          <div className="flex items-center gap-2.5">
-            <ShieldCheck size={20} className="text-primary" />
-            <h2 className="font-display text-base font-bold text-foreground">Reassign Role & Mahall</h2>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">
-            <X size={18} />
-          </button>
-        </div>
+  return typeof document !== 'undefined'
+    ? createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in-0">
+          <div className="relative w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck size={20} className="text-primary" />
+                <h2 className="font-display text-base font-bold text-foreground">Reassign Role & Mahall</h2>
+              </div>
+              <button type="button" onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">
+                <X size={18} />
+              </button>
+            </div>
 
-        <div className="rounded-2xl border bg-muted/40 p-3 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 font-bold text-primary">
-            {item.user.initials}
-          </div>
-          <div>
-            <p className="font-bold text-xs text-foreground">{item.user.name}</p>
-            <p className="text-[11px] text-muted-foreground">{item.user.email}</p>
-          </div>
-        </div>
+            <div className="rounded-2xl border bg-muted/40 p-3 flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 font-bold text-primary">
+                {item.user.initials}
+              </div>
+              <div>
+                <p className="font-bold text-xs text-foreground">{item.user.name}</p>
+                <p className="text-[11px] text-muted-foreground">{item.user.email}</p>
+              </div>
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
-          <div>
-            <label className="text-xs font-semibold text-foreground">Assign Role</label>
-            <select
-              value={selectedRole}
-              onChange={(e) => setSelectedRole(e.target.value as Role)}
-              className="mt-1 block w-full rounded-xl border border-input bg-card px-3 py-2.5 text-xs font-semibold text-foreground focus:outline-none"
-            >
-              <option value="Committee Admin">Committee Admin (Mahall Leader)</option>
-              <option value="Member">Member (Borrower / Contributor)</option>
-              <option value="Guarantor">Guarantor (Kafala Voucher)</option>
-              <option value="Auditor">Auditor (Financial Oversight)</option>
-              <option value="Super Admin">Super Admin (Federation Level)</option>
-            </select>
-          </div>
+            <form onSubmit={handleSubmit} className="space-y-3.5">
+              <div>
+                <label className="text-xs font-semibold text-foreground">Assign Role</label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as Role)}
+                  className="mt-1 block w-full rounded-xl border border-input bg-card px-3 py-2.5 text-xs font-semibold text-foreground focus:outline-none"
+                >
+                  <option value="Committee Admin">Committee Admin (Mahall Leader)</option>
+                  <option value="Member">Member (Borrower / Contributor)</option>
+                  <option value="Guarantor">Guarantor (Kafala Voucher)</option>
+                  <option value="Auditor">Auditor (Financial Oversight)</option>
+                  <option value="Super Admin">Super Admin (Federation Level)</option>
+                </select>
+              </div>
 
-          <div>
-            <label className="text-xs font-semibold text-foreground">Assign / Transfer to Mahallu</label>
-            <select
-              value={selectedCircleId}
-              onChange={(e) => setSelectedCircleId(e.target.value)}
-              className="mt-1 block w-full rounded-xl border border-input bg-card px-3 py-2.5 text-xs font-semibold text-foreground focus:outline-none"
-            >
-              {circles.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.mosque} ({c.name})
-                </option>
-              ))}
-            </select>
-          </div>
+              <div>
+                <label className="text-xs font-semibold text-foreground">Assign / Transfer to Mahallu</label>
+                <select
+                  value={selectedCircleId}
+                  onChange={(e) => setSelectedCircleId(e.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-input bg-card px-3 py-2.5 text-xs font-semibold text-foreground focus:outline-none"
+                >
+                  {circles.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.mosque} ({c.name})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="flex gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1 rounded-xl">
-              Cancel
-            </Button>
-            <Button type="submit" disabled={submitting} className="flex-1 rounded-xl font-bold">
-              {submitting ? 'Saving...' : 'Update Assignment'}
-            </Button>
+              <div className="flex gap-2 pt-2">
+                <Button type="button" variant="outline" onClick={onClose} className="flex-1 rounded-xl">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={submitting} className="flex-1 rounded-xl font-bold">
+                  {submitting ? 'Saving...' : 'Update Assignment'}
+                </Button>
+              </div>
+            </form>
           </div>
-        </form>
-      </div>
-    </div>
-  );
+        </div>,
+        document.body
+      )
+    : null;
 }

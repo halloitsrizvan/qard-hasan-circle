@@ -33,6 +33,7 @@ export interface Translations {
   auditor: string;
   quickDemoTour: string;
   wealthAndChit: string;
+  profile: string;
 }
 
 const translations: Record<Language, Translations> = {
@@ -48,6 +49,7 @@ const translations: Record<Language, Translations> = {
     committee: 'Committee Console',
     rules: 'Rules & Principles',
     settings: 'Settings',
+    profile: 'My Profile',
     contribute: 'Contribute',
     requestLoan: 'Request Loan',
     poolBalance: 'Available pool balance',
@@ -80,6 +82,7 @@ const translations: Record<Language, Translations> = {
     committee: 'കമ്മിറ്റി കൺസോൾ',
     rules: 'നിയമങ്ങളും തത്വങ്ങളും',
     settings: 'ക്രമീകരണങ്ങൾ',
+    profile: 'എന്റെ പ്രൊഫൈൽ',
     contribute: 'വിഹിതം നൽകുക',
     requestLoan: 'വായ്പ അപേക്ഷിക്കുക',
     poolBalance: 'ലഭ്യമായ പൂൾ ഫണ്ട്',
@@ -112,6 +115,7 @@ const translations: Record<Language, Translations> = {
     committee: 'कमेटी कंसोल',
     rules: 'नियम और सिद्धांत',
     settings: 'सेटिंग्स',
+    profile: 'मेरी प्रोफाइल',
     contribute: 'योगदान करें',
     requestLoan: 'ऋण का अनुरोध करें',
     poolBalance: 'उपलब्ध पूल बैलेंस',
