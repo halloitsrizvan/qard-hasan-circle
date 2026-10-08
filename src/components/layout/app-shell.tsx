@@ -175,6 +175,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   const roles: Role[] = ['Super Admin', 'Committee Admin', 'Member', 'Guarantor', 'Auditor'];
+  const roleAccounts: Record<Role, { name: string; email: string }> = {
+    'Super Admin': { name: 'Super Admin', email: 'qard@gmail.com' },
+    'Committee Admin': { name: 'Abdul Kareem', email: 'abdul.kareem@perinthalmanna.org' },
+    'Member': { name: 'Rahim Mohammed', email: 'rahim.mohammed@perinthalmanna.org' },
+    'Guarantor': { name: 'Yusuf Ali', email: 'yusuf.ali@perinthalmanna.org' },
+    'Auditor': { name: 'Rashid Usman', email: 'rashid.usman@perinthalmanna.org' }
+  };
   const roleDescriptions: Record<Role, string> = {
     'Super Admin': 'Full authority over all users, roles & circle settings',
     'Committee Admin': 'Manage your community circle',
@@ -561,42 +568,57 @@ export function AppShell({ children }: { children: ReactNode }) {
             <ChevronDown size={13} />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" side="top" className="mb-2 w-[300px] rounded-2xl p-2 z-40">
-          <div className="px-3 py-3">
-            <span className="text-[10px] font-semibold tracking-[.1em] text-muted-foreground">EXPLORE THE CIRCLE</span>
-            <h2 className="mt-1 font-display text-lg">A different perspective</h2>
+        <PopoverContent align="end" side="top" className="mb-2 w-[330px] rounded-2xl p-2 z-40 shadow-xl border">
+          <div className="px-3 py-2.5 border-b mb-1">
+            <span className="text-[10px] font-bold tracking-[.12em] text-muted-foreground uppercase">EXPLORE THE CIRCLE</span>
+            <h2 className="font-display text-base font-bold">Switch Demo Account</h2>
+            <p className="text-[11px] text-muted-foreground">Instantly sign in to specific member persona accounts</p>
           </div>
-          {roles.map((r) => (
-            <Button
-              variant="ghost"
-              key={r}
-              onClick={() => {
-                switchRole(r);
-                setSwitchOpen(false);
-              }}
-              className="h-auto w-full justify-start rounded-lg px-3 py-3"
-            >
-              <span className="flex size-8 items-center justify-center rounded-lg bg-secondary text-primary">
-                {r === 'Super Admin' ? (
-                  <Crown size={18} className="text-amber-500" />
-                ) : r === 'Committee Admin' ? (
-                  <ShieldCheck size={18} />
-                ) : r === 'Member' ? (
-                  <Users size={18} />
-                ) : r === 'Guarantor' ? (
-                  <HeartHandshake size={18} />
-                ) : (
-                  <BookOpen size={18} />
-                )}
-              </span>
-              <span className="text-left">
-                <span className="block text-xs">{r}</span>
-                <span className="mt-1 block text-[10px] font-normal text-muted-foreground">{roleDescriptions[r]}</span>
-              </span>
-              {r === role && <Check className="ml-auto text-primary" size={16} />}
-            </Button>
-          ))}
-          <p className="px-3 pb-2 pt-3 text-[10px] text-muted-foreground">Demo profiles only. No real funds are moved.</p>
+          <div className="space-y-0.5">
+            {roles.map((r) => {
+              const account = roleAccounts[r];
+              const isCurrent = r === role;
+              return (
+                <Button
+                  variant="ghost"
+                  key={r}
+                  onClick={() => {
+                    switchRole(r);
+                    setSwitchOpen(false);
+                    toast.success(`Signed in as ${account.name} (${r})`);
+                  }}
+                  className={`h-auto w-full justify-start rounded-xl px-3 py-2.5 text-left transition-colors ${
+                    isCurrent ? 'bg-primary/10 border border-primary/20' : 'hover:bg-secondary/70'
+                  }`}
+                >
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
+                    {r === 'Super Admin' ? (
+                      <Crown size={17} className="text-amber-500" />
+                    ) : r === 'Committee Admin' ? (
+                      <ShieldCheck size={17} />
+                    ) : r === 'Member' ? (
+                      <Users size={17} />
+                    ) : r === 'Guarantor' ? (
+                      <HeartHandshake size={17} />
+                    ) : (
+                      <BookOpen size={17} />
+                    )}
+                  </span>
+                  <div className="ml-2.5 min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="font-bold text-xs text-foreground">{r}</span>
+                      <span className="text-[10px] font-medium text-muted-foreground truncate">{account.name}</span>
+                    </div>
+                    <p className="truncate text-[10px] font-mono text-muted-foreground">{account.email}</p>
+                  </div>
+                  {isCurrent && <Check className="ml-2 shrink-0 text-primary" size={15} />}
+                </Button>
+              );
+            })}
+          </div>
+          <p className="px-3 pb-1 pt-2.5 text-[10px] text-muted-foreground border-t mt-1">
+            Simulated Shariah accounts with live isolated permissions.
+          </p>
         </PopoverContent>
       </Popover>
 

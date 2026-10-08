@@ -1092,20 +1092,26 @@ export async function fetchUserByEmailFromDB(email: string): Promise<User | null
 }
 
 export async function fetchUserByRoleFromDB(role: Role): Promise<User> {
-  try {
-    await ensureFirestoreInitialized();
-    const q = query(collection(db, USERS_COL), where('role', '==', role));
-    const snaps = await getDocs(q);
-    if (!snaps.empty && snaps.docs[0]) {
-      return snaps.docs[0].data() as User;
-    }
-  } catch (err) {
-    console.warn('User by role fallback:', err);
+  const roleEmailMap: Record<Role, string> = {
+    'Super Admin': 'qard@gmail.com',
+    'Committee Admin': 'abdul.kareem@perinthalmanna.org',
+    'Member': 'rahim.mohammed@perinthalmanna.org',
+    'Guarantor': 'yusuf.ali@perinthalmanna.org',
+    'Auditor': 'rashid.usman@perinthalmanna.org'
+  };
+
+  const targetEmail = roleEmailMap[role];
+  if (targetEmail) {
+    const user = await fetchUserByEmailFromDB(targetEmail);
+    if (user) return structuredClone(user);
   }
 
   if (role === 'Super Admin') {
     return structuredClone(superAdminUser);
   }
+
+  const defaultFound = initialMahalluUsers.find((u) => u.email === targetEmail) || initialMahalluUsers.find((u) => u.role === role);
+  if (defaultFound) return structuredClone(defaultFound);
 
   const found = localUsers.find((u) => u.role === role);
   if (found) return structuredClone(found);
