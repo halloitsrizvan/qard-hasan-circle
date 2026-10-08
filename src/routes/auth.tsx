@@ -567,65 +567,74 @@ function AuthPageComponent() {
                   <div className="rounded-2xl border border-gold/30 bg-gold-soft/50 p-3.5 text-xs">
                     <p className="font-semibold text-gold-foreground flex items-center gap-1.5">
                       <Sparkles size={14} className="text-gold" />
-                      <span>Instant 1-Click Persona Access</span>
+                      <span>Instant 1-Click Persona Sign-In</span>
                     </p>
                     <p className="mt-1 text-[11px] text-muted-foreground">
-                      Pick any role below to enter the circle immediately without entering passwords:
+                      Pick any account below to instantly explore the platform with that user's full history, loans, and permissions:
                     </p>
                   </div>
 
                   <div className="space-y-2">
                     {[
                       {
+                        r: 'Super Admin' as Role,
+                        name: 'Super Admin',
+                        email: 'qard@gmail.com',
+                        desc: 'Full administrative authority across all Mahallu circles (Pass: 123456)',
+                        icon: Crown
+                      },
+                      {
                         r: 'Committee Admin' as Role,
                         name: 'Abdul Kareem',
-                        desc: 'Approve loans, disburse funds, manage ledger',
+                        email: 'abdul.kareem@perinthalmanna.org',
+                        desc: 'Approve loans, disburse emergency funds, manage ledger',
                         icon: ShieldCheck
                       },
                       {
                         r: 'Member' as Role,
                         name: 'Rahim Mohammed',
-                        desc: 'Request loans, pay installments, view wealth share',
+                        email: 'rahim.mohammed@perinthalmanna.org',
+                        desc: 'Request loans, repay installments, view chit pool share',
                         icon: Users
                       },
                       {
                         r: 'Guarantor' as Role,
                         name: 'Yusuf Ali',
-                        desc: 'Review and vouch for member loan requests',
+                        email: 'yusuf.ali@perinthalmanna.org',
+                        desc: 'Review and vouch for community member loan requests',
                         icon: HeartHandshake
-                      },
-                      {
-                        r: 'Super Admin' as Role,
-                        name: 'Abdul Kareem (Super)',
-                        desc: 'Full administrative access & settings',
-                        icon: Crown
                       },
                       {
                         r: 'Auditor' as Role,
                         name: 'Rashid Usman',
-                        desc: 'Cryptographic ledger audit & verification',
+                        email: 'rashid.usman@perinthalmanna.org',
+                        desc: 'Transparent cryptographic ledger audit & verification',
                         icon: BookOpen
                       }
-                    ].map(({ r, name, desc, icon: Icon }) => (
+                    ].map(({ r, name, email: personaEmail, desc, icon: Icon }) => (
                       <button
                         key={r}
                         type="button"
                         onClick={() => handleDemoSelect(r)}
                         disabled={loading}
-                        className="flex w-full items-center justify-between rounded-2xl border border-border bg-card p-3 text-left hover:border-primary/50 hover:bg-muted/50 transition-all cursor-pointer group"
+                        className="flex w-full items-center justify-between rounded-2xl border border-border bg-card p-3.5 text-left hover:border-primary/50 hover:bg-muted/50 transition-all cursor-pointer group shadow-xs"
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                            <Icon size={18} />
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                            <Icon size={19} />
                           </span>
-                          <div>
-                            <p className="text-xs font-bold text-foreground">{name}</p>
-                            <p className="text-[10px] text-muted-foreground">{desc}</p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs font-bold text-foreground">{name}</p>
+                              <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold text-primary">
+                                {r}
+                              </span>
+                            </div>
+                            <p className="text-[10px] font-mono text-muted-foreground truncate">{personaEmail}</p>
+                            <p className="text-[10px] text-muted-foreground mt-0.5">{desc}</p>
                           </div>
                         </div>
-                        <span className="rounded-lg bg-muted px-2 py-1 text-[10px] font-bold text-primary">
-                          {r}
-                        </span>
+                        <ArrowRight size={15} className="text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
                       </button>
                     ))}
                   </div>

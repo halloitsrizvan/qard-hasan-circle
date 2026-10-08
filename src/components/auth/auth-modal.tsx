@@ -596,11 +596,12 @@ export function AuthModal({ isOpen, onClose, initialTab = 'signin' }: AuthModalP
               </p>
               <div className="mt-2.5 grid grid-cols-2 gap-2">
                 {[
-                  { r: 'Committee Admin' as Role, name: 'Abdul Kareem' },
-                  { r: 'Member' as Role, name: 'Rahim Mohammed' },
-                  { r: 'Guarantor' as Role, name: 'Yusuf Ali' },
-                  { r: 'Auditor' as Role, name: 'Farooq Engineer' }
-                ].map(({ r, name }) => (
+                  { r: 'Super Admin' as Role, name: 'Super Admin', tag: 'Super' },
+                  { r: 'Committee Admin' as Role, name: 'Abdul Kareem', tag: 'Admin' },
+                  { r: 'Member' as Role, name: 'Rahim Mohammed', tag: 'Member' },
+                  { r: 'Guarantor' as Role, name: 'Yusuf Ali', tag: 'Guarantor' },
+                  { r: 'Auditor' as Role, name: 'Rashid Usman', tag: 'Auditor' }
+                ].map(({ r, name, tag }) => (
                   <button
                     key={r}
                     type="button"
@@ -608,7 +609,7 @@ export function AuthModal({ isOpen, onClose, initialTab = 'signin' }: AuthModalP
                     className="flex items-center justify-between rounded-xl border border-amber-200/80 bg-white px-3 py-2 text-left text-[11px] font-semibold text-zinc-800 shadow-xs hover:bg-amber-100/60 hover:border-amber-300 transition-all cursor-pointer"
                   >
                     <span className="truncate">{name}</span>
-                    <span className="text-[10px] font-bold text-emerald-700">{r.split(' ')[0]}</span>
+                    <span className="text-[10px] font-bold text-emerald-700">{tag}</span>
                   </button>
                 ))}
               </div>
