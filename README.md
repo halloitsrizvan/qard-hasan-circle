@@ -82,9 +82,28 @@ These rules are strictly validated by the application logic:
   5. *Zero-Interest Installment Repayment*
   6. *Anti-Riba Fee Rejection Demonstration*
 
-### 8. 🔥 Firebase Cloud Database (Firestore)
-- **Firestore DB**: Cloud persistence across `circles`, `users`, `memberships`, `contributions`, `loans`, `installments`, and `ledger`.
+### 8. 🪙 Dual-Pool Financial Engine (70% Emergency / 30% Wealth & Chit Pot)
+- **70% Qard Hasan Emergency Reserve**: Automatically set aside for 0% interest crisis loans (medical, education, urgent relief).
+- **30% Rotating Chit & Wealth Pot (Bhishi/ROSCA)**: Rotating community savings pot with verifiable monthly lucky draws and auction dividend distribution.
+- **Dynamic Balance Accounting**: Automatically deducts completed chit round disbursements from the accumulated wealth pool.
+
+### 9. 🔥 Firebase Cloud Database (Firestore) & Authentication
+- **Firestore DB**: Real-time cloud persistence across `circles`, `users`, `memberships`, `contributions`, `loans`, `installments`, `ledger`, and `chit_rounds`.
 - **One-Click Firestore Sync / Re-seed**: Sync or reset collections directly from the Settings page.
+
+---
+
+## 🔑 Demo Accounts for Evaluators & Judges
+
+You can use the **1-Click Persona Switcher** (bottom-right of the screen) or log in directly via the `/auth` page with these pre-configured accounts:
+
+| Role | Name | Email | Password | What You Can Test |
+| :--- | :--- | :--- | :--- | :--- |
+| 👑 **Super Admin** | Super Admin | `qard@gmail.com` | `123456` | Multi-Mahallu federation oversight, cross-circle stats, system settings |
+| 🛡️ **Committee Admin** | Abdul Kareem | `abdul.kareem@perinthalmanna.org` | `123456` | Approve & disburse loans, manage 70/30 split ratio, conduct chit draws |
+| 👤 **Member** | Rahim Mohammed | `rahim.mohammed@perinthalmanna.org` | `123456` | Request 0% loans, repay active loans, record monthly commitments |
+| 🤝 **Guarantor** | Yusuf Ali | `yusuf.ali@perinthalmanna.org` | `123456` | Review & vouch for member loan applications (*Kafalah*) |
+| 📖 **Auditor** | Rashid Usman | `rashid.usman@perinthalmanna.org` | `123456` | Audit SHA-256 cryptographic ledger, export CSV & printable reports |
 
 ---
 
